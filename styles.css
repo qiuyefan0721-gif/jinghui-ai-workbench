@@ -2,3 +2,14 @@
 /* Keep the working surface stable during state updates and narrow layouts. */
 .breadcrumb{min-width:0}.breadcrumb strong{white-space:nowrap}.modal-content>.drawer-footer,.modal-content form>.drawer-footer{position:sticky;bottom:-24px;background:#fff;padding-bottom:7px;z-index:2}.toast{max-width:440px}#toasts{left:auto;right:24px;transform:none;top:78px}.ops-home-tabs+.card-body{padding-top:19px}@media(max-width:700px){.breadcrumb>span{display:none}.breadcrumb>svg{display:none}.breadcrumb strong{font-size:11px}.topbar{gap:6px}.top-actions{gap:4px}.demo-pill{max-width:130px;overflow:hidden;text-overflow:ellipsis}#toasts{right:12px;left:12px;top:67px}.toast{min-width:0}.modal-content>.drawer-footer,.modal-content form>.drawer-footer{bottom:-19px}}
 .assistant-panel~.demo-control{display:none}
+
+/* Compact working surface: render card content and spacing at 70%. */
+:root{--workbench-density:.7}
+.main-content{zoom:var(--workbench-density);max-width:none}
+.main-content .chart>svg{max-height:260px}
+.main-content .ops-business-grid .chart>svg{max-height:171px}
+.main-content .review-chart svg{max-height:290px}
+.assistant-open .main-content{margin-right:calc(365px / var(--workbench-density))}
+.modal{zoom:var(--workbench-density);max-height:calc(90vh / var(--workbench-density))}
+@media(max-width:1200px){.assistant-open .main-content{margin-right:0}}
+@media(max-width:700px){.modal{max-height:calc(93vh / var(--workbench-density))}}
