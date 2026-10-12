@@ -7,13 +7,53 @@ const initial=stage=>({stage,route:stage==='review'?'review':'home',taskId:'P001
 const key='jinghui-workbench-v1';let loaded;try{loaded=JSON.parse(localStorage.getItem(key))}catch{};
 export const state=loaded?.tasks?loaded:initial('plan');
 if(state.automation.running)state.automation.running=false;
-state.tasks.forEach(t=>{if(t.status==='running')t.status='failed';(t.scenarios||[]).forEach(s=>{if(s.status==='running')s.status='idle'})});
+state.tasks.forEach(t=>{(t.scenarios||[]).forEach(s=>{if(s.status==='running')s.status='idle'})});
 export const task=(id=state.taskId)=>state.tasks.find(t=>t.id===id);
 export const version=(t,id=t?.viewed)=>t?.versions?.find(v=>v.id===id);
 export function save(){try{localStorage.setItem(key,JSON.stringify(state))}catch{}window.dispatchEvent(new Event('app:render'))}
 export function nav(route,params={}){Object.assign(state,{route},params);save();window.scrollTo(0,0)}
 export const demoDate=()=>state.stage==='review'?'2026年11月02日':'2026年09月30日';
-export function switchStage(stage,reset=false){if(!reset)localStorage.setItem(key+'-'+state.stage,JSON.stringify(state));let saved;try{saved=JSON.parse(localStorage.getItem(key+'-'+stage))}catch{};Object.keys(state).forEach(k=>delete state[k]);Object.assign(state,(!reset&&saved)||initial(stage));save();closeModal();toast('已切换到'+({plan:'计划处理',first:'首次配置',review:'历史复盘'}[stage])+'演示')}
+export function switchStage(stage,reset=false){if(!reset)localStorage.setItem(key+'-'+state.stage,JSON.stringify(state));let saved;try{saved=JSON.parse(localStorage.getItem(key+'-'+stage))}catch{};Object.keys(state).forEach(k=>delete state[k]);Object.assign(state,(!reset&&saved)||initial(stage));resumeForecastRuns();save();closeModal();toast('已切换到'+({plan:'计划处理',first:'首次配置',review:'历史复盘'}[stage])+'演示')}
+// Forecast jobs persist their deadline so refreshes and stage changes can resume safely.
+const forecastTimers=new Map();
+export function forecastScopeError(d={}){
+  const warehouses=d.warehouses||[];
+  return d.start==='2026-10-01'&&d.end==='2026-10-30'&&d.product==='A商品'&&d.region==='华东'&&warehouses.length===2&&warehouses.includes('上海仓')&&warehouses.includes('杭州仓')?'':'当前原型仅提供华东 A商品、上海仓和杭州仓、2026-10-01 至 2026-10-30 的演示数据。请修改条件后计算；其他范围可保存草稿。';
+}
+export function resumeForecastRuns(){
+  forecastTimers.forEach(clearTimeout);forecastTimers.clear();
+  let changed=false;
+  for(const t of state.tasks){
+    let run=t.runHistory?.[0];
+    // Older builds marked an interrupted job failed without updating its run record.
+    if(t.status==='failed'&&run?.status==='running'&&!t.error&&!t.versions?.length){t.status='running';changed=true;}
+    if(t.status!=='running')continue;
+    if(run&&run.status!=='running'){t.status=run.status;changed=true;continue;}
+    if(!run){t.runHistory??=[];run={id:Date.now(),status:'running',time:'09-30 09:00'};t.runHistory.unshift(run);changed=true;}
+    if(!Number.isFinite(run.completeAt)){
+      run.startedAt=Date.now();run.completeAt=run.startedAt+2600;changed=true;
+    }
+    if(!run.scope){run.scope={...t.form,product:t.product,region:t.region,warehouses:[...(t.warehouses||[])]};changed=true;}
+    t.runToken??=1;
+    const token=t.runToken;
+    const complete=()=>{
+      if(task(t.id)!==t||t.status!=='running'||t.runToken!==token||t.runHistory[0]!==run)return;
+      forecastTimers.delete(t.id);
+      const error=forecastScopeError(run.scope);
+      run.finishedAt=Date.now();
+      if(error){t.status=run.status='failed';t.error=error;save();return;}
+      if(!t.versions?.length){
+        t.versions=[{id:'V0',total:sum(baseline),data:[...baseline],source:'AI基线',parent:null,reason:'根据本次范围生成的独立预测基线',created:'09-30 09:02',rate:0}];
+        t.viewed='V0';t.candidate='V0';t.confirmed=null;
+        t.scenarios=[{id:'S1',name:'谨慎方案',rate:8,status:'idle',total:null,version:null},{id:'S2',name:'扩量方案',rate:10,status:'idle',total:null,version:null}];
+      }
+      t.status=run.status='success';delete t.error;
+      save();toast(`${t.name} 计算完成，请确认采用版本`);
+    };
+    forecastTimers.set(t.id,setTimeout(complete,Math.max(0,run.completeAt-Date.now())));
+  }
+  if(changed)save();
+}
 const paths={home:'M3 10 12 3l9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z',chart:'M4 3v17h17M8 15l4-5 4 3 5-8',clock:'M12 8v5l3 2M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',layers:'m12 3 10 5-10 5L2 8Zm-10 9 10 5 10-5M2 16l10 5 10-5',sparkles:'m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5ZM20 2v4M18 4h4',settings:'M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M5 19l2-2M17 7l2-2',plus:'M12 5v14M5 12h14',arrow:'M5 12h14m-5-5 5 5-5 5',chevron:'m9 5 7 7-7 7',check:'m5 12 4 4L19 6',x:'m6 6 12 12M6 18 18 6',search:'M21 21l-6-6M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0',bell:'M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4',help:'M9 8a3 3 0 1 1 5 3c-2 1-2 2-2 3M12 17v.1M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',download:'M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5',filter:'M3 4h18l-7 8v7l-4 2v-9Z',more:'M5 12h.1M12 12h.1M19 12h.1',play:'m8 4 12 8-12 8Z',pause:'M8 4v16M16 4v16',refresh:'M20 7a9 9 0 1 0 1 8M20 2v6h-6',checkCircle:'m7 12 3 3 7-7M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',alert:'m12 3 10 18H2ZM12 9v5m0 3v.1',file:'M14 2H4v20h16V8Zm0 0v6h6M8 12h8m-8 4h6',calendar:'M3 5h18v16H3ZM7 2v6m10-6v6M3 10h18',box:'m12 2 10 5v10l-10 5-10-5V7Zm0 10L2 7m10 5 10-5M12 12v10M7 4l10 5',wand:'m3 21 14-14 4 4L7 25M13 2v3M20 2v2M22 6h2M5 5v3M3 7h4',send:'m22 2-7 20-4-9-9-4Zm0 0L11 13',external:'M14 3h7v7m0-7L10 14M10 3H3v18h18v-7',menu:'M4 6h16M4 12h16M4 18h16',chevronLeft:'m15 5-7 7 7 7',chevronDown:'m5 9 7 7 7-7',grid:'M3 3h7v7H3Zm11 0h7v7h-7ZM3 14h7v7H3Zm11 0h7v7h-7Z',trash:'M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7',edit:'m15 3 6 6L8 22H2v-6ZM13 5l6 6',shield:'m12 2 9 4v6c0 6-9 10-9 10S3 18 3 12V6Zm-5 9 3 3 7-7',users:'M16 21v-3a5 5 0 0 0-5-5H7a5 5 0 0 0-5 5v3M13 6a4 4 0 1 1-8 0 4 4 0 0 1 8 0M17 3a4 4 0 0 1 0 8M22 21v-3a5 5 0 0 0-3-4',info:'M12 11v6m0-10v.1M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0'};
 export const icon=(n,size=18)=>`<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[n]||paths.grid}"/></svg>`;
 export const badge=(s,type='purple')=>`<span class="badge ${type}">${esc(s)}</span>`;
