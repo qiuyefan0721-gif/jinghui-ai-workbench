@@ -20,10 +20,24 @@ export function forecastScopeError(d={}){
   const warehouses=d.warehouses||[];
   return d.start==='2026-10-01'&&d.end==='2026-10-30'&&d.product==='A商品'&&d.region==='华东'&&warehouses.length===2&&warehouses.includes('上海仓')&&warehouses.includes('杭州仓')?'':'当前原型仅提供华东 A商品、上海仓和杭州仓、2026-10-01 至 2026-10-30 的演示数据。请修改条件后计算；其他范围可保存草稿。';
 }
+// Add a version-bound diagnosis without replacing existing business decisions.
+export function ensureForecastDiagnosis(t){
+  if(t.status!=='success'||t.diagnosis)return false;
+  const v=version(t,t.candidate||t.confirmed||t.viewed)||t.versions?.[0];
+  if(!v)return false;
+  const confirmed=t.confirmed===v.id,confirmation=confirmed?v.confirmation:null;
+  t.diagnosis={id:'D'+t.id+v.id,version:v.id,kind:v.id==='V0'?'baseline':'adjustment',
+    status:confirmed?((v.rate||0)>9?'accepted':'resolved'):'open',
+    evidence:confirmation?.evidence||'',source:confirmation?.source||'',reason:confirmation?.reason||'',
+    ruleSnapshot:structuredClone(state.rules.find(r=>r.status==='enabled')||null),
+    history:[{text:confirmed?'已补全诊断记录，保留原业务确认结论':'计算完成，同步检查预测数据；活动依据待业务核实',time:v.created||'09-30 09:02'}]};
+  return true;
+}
 export function resumeForecastRuns(){
   forecastTimers.forEach(clearTimeout);forecastTimers.clear();
   let changed=false;
   for(const t of state.tasks){
+    if(ensureForecastDiagnosis(t))changed=true;
     let run=t.runHistory?.[0];
     // Older builds marked an interrupted job failed without updating its run record.
     if(t.status==='failed'&&run?.status==='running'&&!t.error&&!t.versions?.length){t.status='running';changed=true;}
@@ -48,6 +62,7 @@ export function resumeForecastRuns(){
         t.scenarios=[{id:'S1',name:'谨慎方案',rate:8,status:'idle',total:null,version:null},{id:'S2',name:'扩量方案',rate:10,status:'idle',total:null,version:null}];
       }
       t.status=run.status='success';delete t.error;
+      ensureForecastDiagnosis(t);
       save();toast(`${t.name} 计算完成，请确认采用版本`);
     };
     forecastTimers.set(t.id,setTimeout(complete,Math.max(0,run.completeAt-Date.now())));
