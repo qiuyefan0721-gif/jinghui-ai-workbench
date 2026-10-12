@@ -6,14 +6,15 @@ export const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 const initial=stage=>({stage,route:stage==='review'?'review':'home',taskId:'P001',tab:'result',settings:{configured:stage!=='first',region:'华东',product:'A商品',warehouses:['上海仓','杭州仓'],frequency:'daily',time:'08:30',granularity:'week',sort:'priority',pinned:['forecast','promo']},automation:{enabled:stage!=='first',running:false,runs:stage==='first'?[]:[{id:'Run001',status:'success',time:'09-30 08:30',summary:'检查完成，发现1项待处理问题',config:'华东 · A商品 · 两仓 / R1'}]},rules:[{id:'R001',name:'促销假设超出参考范围时提醒',threshold:9,revision:1,status:stage==='first'?'draft':'enabled',draft:null}],experiences:[],tasks:stage==='first'?[]:[{id:'P001',name:'A商品 · 华东 · 10月需求预测',region:'华东',product:'A商品',warehouses:['上海仓','杭州仓'],period:'2026-10-01 — 10-30',status:'success',versions:[{id:'V0',total:12400,data:[...baseline],source:'AI基线',parent:null,reason:'基于历史销量与业务日历生成',created:'09-30 08:00',rate:0},{id:'V1',total:12720,data:baseline.map((v,i)=>v+(i<4?80:0)),source:'人工调整',parent:'V0',reason:'促销前四天补充需求',created:'09-30 08:10',rate:5},{id:'V2',total:13144,data:baseline.map((v,i)=>i<7?Math.round(v*1.12):v),source:'人工调整',parent:'V0',reason:'促销周需求上调12%',created:'09-30 08:20',rate:12}],viewed:'V2',confirmed:'V0',candidate:'V2',diagnosis:{id:'D001',version:'V2',status:'open',evidence:'',source:'',reason:'',history:[],remind:''},scenarios:[{id:'S1',name:'谨慎方案',rate:8,status:'idle',total:null,version:null,revision:1},{id:'S2',name:'扩量方案',rate:10,status:'idle',total:null,version:null,revision:1}]}],assistant:[],demoFailure:false});
 const key='jinghui-workbench-v1';let loaded;try{loaded=JSON.parse(localStorage.getItem(key))}catch{};
 export const state=loaded?.tasks?loaded:initial('plan');
-if(state.automation.running)state.automation.running=false;
+normalizeAutomations();
+try{localStorage.setItem(key,JSON.stringify(state))}catch{}
 state.tasks.forEach(t=>{(t.scenarios||[]).forEach(s=>{if(s.status==='running')s.status='idle'})});
 export const task=(id=state.taskId)=>state.tasks.find(t=>t.id===id);
 export const version=(t,id=t?.viewed)=>t?.versions?.find(v=>v.id===id);
 export function save(){try{localStorage.setItem(key,JSON.stringify(state))}catch{}window.dispatchEvent(new Event('app:render'))}
 export function nav(route,params={}){Object.assign(state,{route},params);save();window.scrollTo(0,0)}
 export const demoDate=()=>state.stage==='review'?'2026年11月02日':'2026年09月30日';
-export function switchStage(stage,reset=false){if(!reset)localStorage.setItem(key+'-'+state.stage,JSON.stringify(state));let saved;try{saved=JSON.parse(localStorage.getItem(key+'-'+stage))}catch{};Object.keys(state).forEach(k=>delete state[k]);Object.assign(state,(!reset&&saved)||initial(stage));resumeForecastRuns();save();closeModal();toast('已切换到'+({plan:'计划处理',first:'首次配置',review:'历史复盘'}[stage])+'演示')}
+export function switchStage(stage,reset=false){if(!reset)localStorage.setItem(key+'-'+state.stage,JSON.stringify(state));let saved;try{saved=JSON.parse(localStorage.getItem(key+'-'+stage))}catch{};Object.keys(state).forEach(k=>delete state[k]);Object.assign(state,(!reset&&saved)||initial(stage));normalizeAutomations();resumeForecastRuns();resumeAutomationRuns();save();closeModal();toast('已切换到'+({plan:'计划处理',first:'首次配置',review:'历史复盘'}[stage])+'演示')}
 // Forecast jobs persist their deadline so refreshes and stage changes can resume safely.
 const forecastTimers=new Map();
 export function forecastScopeError(d={}){
@@ -83,4 +84,138 @@ export const pendingTasks=()=>state.tasks.filter(t=>t.candidate&&!t.archived);
 export function openEvidence(){modal('促销假设 · 判断依据',`<div class="alert warning">当前为事前风险提示。历史参考不能证明本次活动一定高估。</div><h3>历史可比活动 · 演示样本</h3><div class="table-wrap"><table><thead><tr><th>参考样本</th><th>匹配范围</th><th>活动增幅</th></tr></thead><tbody>${[7,8,9].map((v,i)=>`<tr><td>历史活动 0${i+1}</td><td>A商品 · 同类渠道</td><td>${v}%</td></tr>`).join('')}</tbody></table></div><div class="section-gap"><h3>仍需核实</h3><p class="muted">本次促销的渠道覆盖、活动力度，以及与历史样本的可比性。</p></div><div class="drawer-footer"><button class="btn primary" data-close>我知道了</button></div>`)}
 export function openSettings(){window.dispatchEvent(new Event('app:settings'))}
 export function addVersion(t,data,meta={}){const id='V'+(Math.max(-1,...t.versions.map(v=>Number(v.id.slice(1))))+1);const v={id,data,total:sum(data),source:'情景模拟',parent:'V0',reason:'情景调整',created:'09-30 09:00',...meta};t.versions.push(v);t.viewed=id;t.candidate=id;const old=t.diagnosis;if(old){t.diagnosisHistory??=[];t.diagnosisHistory.push(structuredClone(old))}t.diagnosis={id:'D'+t.id+id,version:id,status:v.rate>9||!old?.evidence?'open':'resolved',evidence:old?.evidence||'',source:old?.source||'',reason:'',history:[]};save();return v}
-export async function runAutomation(outcome='success'){if(state.automation.running)return toast('当前检查正在运行','info');const auto=state.automation;state.automation.running=true;const id='Run'+String(state.automation.runs.length+1).padStart(3,'0');const r={id,taskName:state.automation.name||'华东A商品每日预测诊断',status:'running',time:'09-30 09:00',summary:'正在读取预测、检查规则并整理提醒',ruleSnapshot:structuredClone(state.rules.find(r=>r.status==='enabled')||null),configSnapshot:structuredClone(state.settings),config:`${state.settings.region} / ${state.settings.warehouses.join('、')} / R${state.rules[0]?.revision||1}`};state.automation.runs.unshift(r);save();await new Promise(r=>setTimeout(r,1700));if(state.automation!==auto)return;r.status=outcome;r.summary=outcome==='failed'?'未能读取预测快照，本次未生成提醒':outcome==='partial'?'上海仓检查完成，杭州仓数据尚未就绪':`检查完成，${pendingTasks().length?'发现'+pendingTasks().length+'项需核对':'暂无待处理异常'}`;state.automation.running=false;save();toast(r.summary,outcome==='failed'?'info':'success')}
+// Each entrusted task owns its configuration, history and persisted in-flight job.
+export function normalizeAutomations(){
+  let changed=false;
+  const s=state.settings||{},old=state.automation;
+  if(!Array.isArray(state.automations)){
+    state.automations=[{...old,id:old?.id||'T001',name:old?.name||'华东A商品每日预测诊断',
+      region:old?.region||s.region||'华东',product:old?.product||s.product||'A商品',
+      warehouses:[...(old?.warehouses||s.warehouses||['上海仓','杭州仓'])],
+      frequency:old?.frequency||s.frequency||'daily',time:old?.time||s.time||'08:30',
+      ruleIds:old?.ruleIds||state.rules.filter(r=>r.status==='enabled').map(r=>r.id),
+      enabled:old?.enabled??false,running:!!old?.running,runs:old?.runs||[]}];
+    changed=true;
+  }
+  for(const [i,a] of state.automations.entries()){
+    if(!a.id){a.id='T'+String(i+1).padStart(3,'0');changed=true;}
+    if(!a.name){a.name=`${a.region||s.region||'华东'}${a.product||s.product||'A商品'}预测诊断`;changed=true;}
+    for(const [field,value] of Object.entries({region:s.region||'华东',product:s.product||'A商品',warehouses:s.warehouses||['上海仓','杭州仓'],frequency:s.frequency||'daily',time:s.time||'08:30',runs:[],ruleIds:state.rules.filter(r=>r.status==='enabled').map(r=>r.id)})){
+      if(a[field]===undefined){a[field]=structuredClone(value);changed=true;}
+    }
+    if(typeof a.enabled!=='boolean'){a.enabled=false;changed=true;}
+    const running=a.runs.some(r=>r.status==='running');
+    if(a.running!==running){a.running=running;changed=true;}
+  }
+  if('automation' in state){delete state.automation;changed=true;}
+  if(!state.automations.some(a=>a.id===state.automationId)){
+    state.automationId=state.automations[0]?.id||null;changed=true;
+  }
+  return changed;
+}
+export const automation=(id=state.automationId||'T001')=>state.automations.find(a=>a.id===id);
+export const automationRules=a=>state.rules.filter(r=>a?.ruleIds?.includes(r.id)&&r.status==='enabled');
+const automationTimers=new Map();
+const automationScopeLabel=s=>`${s.region} · ${s.product} · ${s.warehouses.join('、')}`;
+function automationScope(a,requested){
+  const scope={region:a.region,product:a.product,warehouses:[...a.warehouses]};
+  if(typeof requested==='string')scope.warehouses=scope.warehouses.filter(w=>requested.includes(w));
+  else if(requested){
+    if((requested.region&&requested.region!==a.region)||(requested.product&&requested.product!==a.product))return null;
+    if(requested.warehouses)scope.warehouses=scope.warehouses.filter(w=>requested.warehouses.includes(w));
+  }
+  return scope.warehouses.length?scope:null;
+}
+function automationForecasts(scope){
+  // The prototype exposes warehouse-level detail within each forecast.
+  return state.tasks.filter(t=>t.status==='success'&&!t.archived&&t.region===scope.region&&t.product===scope.product&&t.warehouses?.some(w=>scope.warehouses.includes(w)));
+}
+function automationChecks(tasks,rules,scope){
+  return tasks.map(t=>{
+    const v=version(t,t.candidate||t.confirmed||t.viewed)||t.versions?.[0];
+    const d=t.diagnosis?.version===v?.id?t.diagnosis:null;
+    const evidence=!!((d?.evidence&&d?.source)||(v?.confirmation?.evidence&&v?.confirmation?.source));
+    const hits=rules.filter(r=>Number(v?.rate||0)>Number(r.threshold??9)||((r.evidenceMissing??true)&&!evidence));
+    return {taskId:t.id,taskName:t.name,version:v?.id||null,warehouses:t.warehouses.filter(w=>scope.warehouses.includes(w)),rate:Number(v?.rate||0),evidenceMissing:!evidence,ruleIds:hits.map(r=>r.id)};
+  });
+}
+function snapshotAutomationRun(a,r){
+  const scope=r.scopeSnapshot||automationScope(a,r.scope);
+  if(!scope)return false;
+  r.scopeSnapshot=structuredClone(scope);r.scope=automationScopeLabel(scope);
+  r.rulesSnapshot??=structuredClone(automationRules(a));
+  r.ruleSnapshot??=r.rulesSnapshot[0]||null;
+  r.configSnapshot??=structuredClone({...a,runs:undefined,running:undefined});
+  r.taskName??=a.name;r.taskId??=a.id;
+  r.checks??=automationChecks(automationForecasts(scope),r.rulesSnapshot,scope);
+  r.relatedTaskIds??=r.checks.map(c=>c.taskId);
+  return true;
+}
+export function resumeAutomationRuns(){
+  automationTimers.forEach(clearTimeout);automationTimers.clear();
+  let changed=false;
+  for(const a of state.automations){
+    const running=a.runs.filter(r=>r.status==='running');
+    if(a.running!==!!running.length){a.running=!!running.length;changed=true;}
+    for(const r of running){
+      if(!r.scopeSnapshot){
+        if(!snapshotAutomationRun(a,r)){r.status='failed';r.summary='运行范围已不可用，请检查配置后重试';a.running=a.runs.some(x=>x.status==='running');changed=true;continue;}
+        changed=true;
+      }
+      if(!Number.isFinite(r.completeAt)){r.startedAt=Date.now();r.completeAt=r.startedAt+1700;changed=true;}
+      const complete=()=>{
+        if(automation(a.id)!==a||!a.runs.includes(r)||r.status!=='running')return;
+        automationTimers.delete(r.id);
+        const outcome=['success','failed','partial'].includes(r.outcome)?r.outcome:'success';
+        r.status=outcome;r.finishedAt=Date.now();
+        let checks=r.checks||[];
+        if(outcome==='failed'){
+          r.summary='未能读取本次范围的预测快照，本次未生成提醒';r.checkedCount=0;r.issueTaskIds=[];
+        }else{
+          if(outcome==='partial'){
+            const warehouses=r.scopeSnapshot.warehouses;
+            r.completedScope=warehouses.length>1?warehouses.slice(0,-1):[];
+            r.remainingScope=warehouses.length>1?warehouses.slice(-1):[...warehouses];
+            checks=checks.filter(c=>c.warehouses.some(w=>r.completedScope.includes(w))).map(c=>({...c,warehouses:c.warehouses.filter(w=>r.completedScope.includes(w))}));
+            r.summary=`${r.completedScope.length?r.completedScope.join('、')+'数据已读取；':''}${r.remainingScope.join('、')}数据未就绪，${checks.length?`已检查${checks.length}项预测的${r.completedScope.join('、')}范围`:'暂无预测可检查'}`;
+          }
+          r.checkedTaskIds=checks.map(c=>c.taskId);r.checkedCount=checks.length;
+          r.issueTaskIds=checks.filter(c=>c.ruleIds.length).map(c=>c.taskId);
+          if(outcome==='success')r.summary=checks.length?`检查完成，共检查${checks.length}项预测的${r.scopeSnapshot.warehouses.join('、')}范围，${r.issueTaskIds.length?'发现'+r.issueTaskIds.length+'项需核对':'未命中当前规则'}`:'检查完成，本次范围暂无可检查的预测';
+          // Link reminders to existing version-bound diagnoses; never confirm a forecast.
+          for(const id of r.issueTaskIds){
+            const t=task(id),check=checks.find(c=>c.taskId===id);
+            if(!t||t.status!=='success')continue;
+            ensureForecastDiagnosis(t);
+            if(t.diagnosis?.version!==check.version)continue;
+            t.diagnosis.automationReminders??=[];
+            t.diagnosis.automationReminders.push({automationId:a.id,runId:r.id,ruleIds:[...check.ruleIds],version:check.version,time:r.time});
+          }
+        }
+        a.running=a.runs.some(x=>x.status==='running');save();toast(`${r.taskName}：${r.summary}`,outcome==='failed'?'info':'success');
+      };
+      automationTimers.set(r.id,setTimeout(complete,Math.max(0,r.completeAt-Date.now())));
+    }
+  }
+  if(changed)save();
+}
+export function runAutomation(outcome='success',automationId,options={}){
+  const a=automation(automationId);
+  if(!a)return toast('持续任务不存在，请重新选择','error');
+  if(a.running||a.runs.some(r=>r.status==='running'))return toast('该持续任务正在运行，请等待完成','info');
+  const rules=automationRules(a);
+  if(!rules.length)return toast('请为该持续任务选择并启用至少一条业务规则','error');
+  const scope=automationScope(a,options.scope);
+  if(!scope)return toast('本次检查范围不在该持续任务配置内','error');
+  const serial=Math.max(0,...a.runs.map(r=>Number(String(r.id).split('-Run')[1])||0))+1;
+  const now=Date.now(),date=new Date(now);
+  const r={id:`${a.id}-Run${String(serial).padStart(3,'0')}`,taskId:a.id,taskName:a.name,status:'running',
+    outcome:['success','partial','failed'].includes(outcome)?outcome:'success',time:date.toLocaleString('sv-SE',{timeZone:'Asia/Shanghai'}).slice(5,16),
+    startedAt:now,completeAt:now+1700,summary:'正在读取本次范围的预测、检查所选规则并整理提醒',
+    scopeSnapshot:scope,scope:automationScopeLabel(scope),rulesSnapshot:structuredClone(rules),ruleSnapshot:structuredClone(rules[0]),
+    configSnapshot:structuredClone({...a,runs:undefined,running:undefined}),
+    config:`${automationScopeLabel(scope)} / ${rules.map(r=>`${r.id} R${r.revision||1}`).join('、')}`};
+  if(options.retryOf)r.retryOf=options.retryOf;
+  r.checks=automationChecks(automationForecasts(scope),rules,scope);r.relatedTaskIds=r.checks.map(c=>c.taskId);
+  a.runs.unshift(r);a.running=true;save();resumeAutomationRuns();return r;
+}
