@@ -1,0 +1,9 @@
+/* Local polish for review charts and readable historical records. */
+#review-days thead { position: sticky; top: 0; z-index: 1; background: #fafbfe; }
+#review-days td { font-variant-numeric: tabular-nums; }
+#review-days tr[data-review-row] { transition: background .15s ease; }
+[data-review-day]:focus { outline: none; fill: #7154e810; }
+[data-review-row] { scroll-margin: 90px; }
+[data-rule-test-result] .alert p:last-child { margin-bottom: 0; }
+[data-experience-form] .textarea, [data-rule-form] .textarea { resize: vertical; line-height: 1.65; }
+[data-experience-form] .drawer-footer, [data-rule-form] .drawer-footer { flex-wrap: wrap; }
