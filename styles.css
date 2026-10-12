@@ -39,3 +39,32 @@
 .assistant-panel .assistant-context{overflow-wrap:anywhere}
 @media(max-width:960px){.sidebar .brand-name{font-size:14px}}
 @media(max-width:700px){.assistant-panel .btn:not(.small){font-size:7.7px}}
+
+/* Forecast creation stays inside the assistant's narrow message column. */
+.assistant-panel .assistant-forecast-card{display:block;width:100%;min-width:0;margin:14px 0;padding:12px;border:1px solid #e5dbfb;border-radius:10px;background:#fcfaff;color:#72788e;font-size:8.4px;line-height:1.7;overflow-wrap:anywhere}
+.assistant-panel .assistant-forecast-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:12px;min-width:0;font-size:9.8px;font-weight:600;color:#62517e}
+.assistant-panel .assistant-forecast-head h3,.assistant-panel .assistant-forecast-head strong{margin:0;font-size:9.8px;line-height:1.6}
+.assistant-panel .assistant-forecast-head p{margin:5px 0 0;font-size:7.7px;font-weight:400;color:#9890aa}
+.assistant-panel .assistant-forecast-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 10px;min-width:0}
+.assistant-panel .assistant-forecast-fields,.assistant-panel .assistant-forecast-fields .field{min-width:0}
+.assistant-panel .assistant-forecast-fields .field{gap:5px;margin-bottom:10px}
+.assistant-panel .assistant-forecast-fields .field-label,.assistant-panel .assistant-forecast-fields label{font-size:7.7px;line-height:1.6;color:#82768f}
+.assistant-panel .assistant-forecast-fields .field-hint{font-size:7px;line-height:1.6}
+.assistant-panel .assistant-forecast-fields input:not([type=checkbox]):not([type=radio]),.assistant-panel .assistant-forecast-fields select,.assistant-panel .assistant-forecast-fields textarea{display:block;width:100%;max-width:100%;min-width:0;min-height:30px;padding:6px 8px;border:1px solid #e5e0ed;border-radius:6px;background:#fff;color:#62667d;font-size:8.4px;line-height:1.6;outline:none}
+.assistant-panel .assistant-forecast-fields input:focus,.assistant-panel .assistant-forecast-fields select:focus,.assistant-panel .assistant-forecast-fields textarea:focus{border-color:#aa92e8;box-shadow:0 0 0 2px #f0e9ff}
+.assistant-panel .assistant-forecast-fields input:disabled,.assistant-panel .assistant-forecast-fields select:disabled{background:#f4f2f8;color:#9b94a9}
+.assistant-panel .assistant-forecast-fields input[type=date]{width:100%;min-width:0;max-width:100%}
+.assistant-panel .assistant-forecast-grid>.field:has(input[type=date]),.assistant-panel .assistant-forecast-grid>label:has(input[type=date]){grid-column:1/-1}
+.assistant-panel .assistant-forecast-fields input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
+.assistant-panel .assistant-forecast-fields .check-row{display:flex;flex-wrap:wrap;gap:6px;padding:5px 0;font-size:7.7px}
+.assistant-panel .assistant-forecast-fields input[type=checkbox],.assistant-panel .assistant-forecast-fields input[type=radio]{flex-shrink:0}
+.assistant-panel .assistant-forecast-actions{display:flex;flex-wrap:wrap;align-items:center;gap:7px;padding-top:10px;margin-top:10px;border-top:1px solid #eee7f8}
+.assistant-panel .assistant-forecast-actions .btn,.assistant-panel .assistant-forecast-actions button{min-height:30px;max-width:100%;padding:6px 9px;font-size:7.7px;line-height:1.6;white-space:normal;overflow-wrap:anywhere}
+.assistant-panel .assistant-forecast-error{margin-top:8px;color:#bc626a;font-size:7.7px;line-height:1.7;overflow-wrap:anywhere}
+.assistant-panel .assistant-forecast-error:empty{display:none}
+.assistant-panel .assistant-forecast-review{margin:10px 0;padding:9px 10px;border:1px solid #e8e0f6;border-radius:7px;background:#f6f2fc;font-size:8.4px;line-height:1.8;overflow-wrap:anywhere}
+.assistant-panel .assistant-forecast-review p{margin:0 0 6px;font-size:8.4px}
+.assistant-panel .assistant-forecast-review p:last-child{margin-bottom:0}
+.assistant-panel .assistant-forecast-review .kv{gap:8px;padding:5px 0;font-size:7.7px;flex-wrap:wrap}
+.assistant-panel .assistant-forecast-status{display:flex;align-items:flex-start;gap:6px;margin:9px 0 0;color:#8d7aaa;font-size:7.7px;line-height:1.7;overflow-wrap:anywhere}
+.assistant-panel .assistant-forecast-status svg{flex-shrink:0;margin-top:2px}

@@ -78,7 +78,7 @@ function confirmationAnswer(t){
 export function contextualAnswer(text){
   const q=String(text||'').trim(),route=state.route,t=selectedTask(),a=selectedAutomation();
   if(!q)return null;
-  if(/新建一次预测|发起一次预测/.test(q))return {text:'可以从新建预测页填写任务名称、商品、仓库和日期。先检查范围，再保存草稿或开始计算。',action:'new',label:'新建预测'};
+  if(/新建一次预测|发起一次预测/.test(q))return {text:'可以在右侧助手的小卡片填写任务名称、商品、仓库和日期。左侧保持当前页面，检查后保存草稿或开始计算。',action:'new',label:'新建预测'};
   if(/调整我的工作设置/.test(q))return {text:'工作设置可以调整职责范围、页面偏好和默认计划。持续任务各自保存独立配置；要修改某项托管，请进入对应任务的编辑配置。',action:'settings',label:'打开工作设置'};
   if(/今天.*(事项|处理)|今日待办/.test(q)){
     const g=taskGroups(),examples=[...g.open,...g.ready].slice(0,3).map(x=>`${x.name}（${x.candidate}）`);
@@ -88,7 +88,7 @@ export function contextualAnswer(text){
   if(route==='tasks'&&/不同状态|任务状态/.test(q))return {text:'创建草稿：条件已保存，尚未计算；计算中：正在生成结果；待调整：诊断仍需核对或等待依据；待确认：候选已准备好，需要业务确认；已确认：已有采用版本。计算失败可查看原因后重试，已归档任务保留历史。'};
   if(route==='new'&&/范围|填写示例|输入示例|草稿|开始计算/.test(q)){
     if(/区别/.test(q))return {text:'保存草稿只保留填写条件，不生成预测结果。开始计算会先校验当前演示是否有对应数据，再生成独立V0基线与预测诊断；结果生成后仍需业务核对确认。'};
-    return {text:'当前演示可计算范围为：华东、A商品、上海仓和杭州仓、2026年10月1日至10月30日。填写示例：“为A商品生成华东上海仓和杭州仓2026年10月1日至10月30日的需求预测，任务名称为10月需求预测”。请在左侧核对识别或填写的条件后再开始计算；其他范围可以保存草稿。'};
+    return {text:'当前演示可计算范围为：华东、A商品、上海仓和杭州仓、2026年10月1日至10月30日。填写示例：“为A商品生成华东上海仓和杭州仓2026年10月1日至10月30日的需求预测，任务名称为10月需求预测”。请在右侧新建预测卡片核对填写的条件后再开始计算；其他范围可以保存草稿。'};
   }
   if(route==='forecast'&&state.tab==='diagnosis'&&/依据|缺|诊断|下一步/.test(q))return diagnosisAnswer(t);
   if(route==='forecast'&&/确认版本前|确认前.*检查/.test(q))return confirmationAnswer(t);
