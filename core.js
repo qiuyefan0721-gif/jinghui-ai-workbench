@@ -8,7 +8,6 @@ const key='jinghui-workbench-v1';let loaded;try{loaded=JSON.parse(localStorage.g
 export const state=loaded?.tasks?loaded:initial('plan');
 normalizeAutomations();
 try{localStorage.setItem(key,JSON.stringify(state))}catch{}
-state.tasks.forEach(t=>{(t.scenarios||[]).forEach(s=>{if(s.status==='running')s.status='idle'})});
 export const task=(id=state.taskId)=>state.tasks.find(t=>t.id===id);
 export const version=(t,id=t?.viewed)=>t?.versions?.find(v=>v.id===id);
 export function save(){try{localStorage.setItem(key,JSON.stringify(state))}catch{}window.dispatchEvent(new Event('app:render'))}
