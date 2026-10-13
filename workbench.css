@@ -12,3 +12,5 @@
 .personal-primary-modules .personal-auto-list{display:block}
 .personal-primary-modules .personal-auto-stats{gap:32px}
 @media(max-width:960px){.personal-primary-modules{grid-template-columns:1fr}.personal-primary-modules .personal-task-list,.personal-primary-modules .personal-auto-list{max-height:none}}
+
+.personal-brief-section{margin-bottom:18px}.personal-brief-section>.personal-module{margin:0}
