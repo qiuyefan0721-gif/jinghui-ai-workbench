@@ -1,4 +1,4 @@
-import {personalConfig,workbenchPreviewBar} from './workbench-builder.js';
+import {personalConfig} from './workbench-builder.js';
 import {renderPersonalWorkbench} from './workbench-view.js';
 import {renderAutomationSummary,bindAutomation} from './automation.js';
 export {renderAutomation,openAutomationConfig} from './automation.js';
@@ -20,7 +20,7 @@ function keepConfirm(host,title,description,onConfirm,label='确认'){const laye
 const taskLink=(t,tab='result',label='查看预测',classes='btn small')=>`<button class="${classes}" data-nav="forecast" data-task="${t.id}" data-tab="${tab}" ${['对比并确认','检查并确认'].includes(label)?'data-pending-version':''}>${label}${icon('arrow',14)}</button>`;
 
 export function renderHome(){
- if(personalConfig())return workbenchPreviewBar()+renderPersonalWorkbench(personalConfig());
+ if(personalConfig())return renderPersonalWorkbench(personalConfig());
  const s=setting(),u=ui(),t=task('P001')||active()[0],v=t&&homeVersion(t,t.candidate||t.viewed,s),c=t&&homeVersion(t,t.confirmed,s),open=openIssues(),wait=waitingIssues(),done=state.tasks.filter(x=>x.diagnosis&&!['open','waiting','snoozed'].includes(x.diagnosis.status)),items=u.homeTab==='waiting'?wait:u.homeTab==='done'?done:open;
 
  return `${head('李明的工作台',`${esc(s.region)}区域 · ${esc(s.product)} · ${esc(s.warehouses.join('、'))}`,`<button class="btn" data-customize-workbench>${icon('sparkles')}定制工作台</button><button class="btn primary" data-nav="new">${icon('plus')}新建预测</button>`)}
