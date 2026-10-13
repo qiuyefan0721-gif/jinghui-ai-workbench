@@ -1,3 +1,4 @@
+import {relatedExperiences} from './forecast-experiences.js';
 import { automation, state, save, nav, toast, modal, closeModal, confirmDialog, icon, esc, fmt, sum, badge, empty, field, baseline, actual, switchStage, task } from './core.js';
 
 const PERIOD = '2026-10-01 — 2026-10-30';
@@ -151,15 +152,17 @@ function editExperience(id=null){
       const target=existing||state.experiences.find(x=>x.sourceKey===seed.sourceKey);
       if(target&&keys.every(k=>(target[k]||'')===values[k])){closeModal();toast('相同来源与内容已保存，打开已有经验');viewExperience(target.id);return;}
       if(target){target.history??=[];target.history.push({...Object.fromEntries(keys.map(k=>[k,target[k]||''])),revision:target.revision,updated:target.updated});Object.assign(target,values,{revision:target.revision+1,updated:dateLabel(),status:'active'});}else state.experiences.push({...seed,...values,id:`E${String(state.experiences.length+1).padStart(3,'0')}`,revision:1,status:'active',history:[],updated:dateLabel(),created:dateLabel(),stage:'review'});
-      const saved=target||state.experiences[state.experiences.length-1];save();closeModal();toast(target?'参考经验已保存新修订，关联规则未自动改变':'参考经验已保存，未启用任何规则');viewExperience(saved.id);
+      const saved=target||state.experiences[state.experiences.length-1];save();closeModal();toast(target?'参考经验已保存新修订，关联规则未自动改变':'参考经验已保存，可在相关预测诊断查看');viewExperience(saved.id);
     };
   },{wide:true});
 }
 
-function viewExperience(id){
+export function viewExperience(id){
   const e=state.experiences.find(e=>e.id===id);if(!e)return;
+  const relatedTask=[task(),...state.tasks].find(t=>t?.status==='success'&&!t.archived&&relatedExperiences(t).some(item=>item.id===id));
   const refs=state.rules.filter(r=>(r.origins||[]).some(o=>o.id===id)||r.draft?.origin?.id===id);
-  modal(e.title,`<div class="row between">${badge(e.status==='archived'?'已归档':'参考经验',e.status==='archived'?'gray':'purple')}<span class="tiny muted">修订R${e.revision} · 李明 · ${esc(e.updated)}</span></div><p class="muted">${esc(e.scope)} · ${esc(e.event)}</p><div class="stack">${[['当时判断',e.judgment||'演示快照未提供'],['本次观察',e.observation],['适用条件',e.conditions||'未填写'],['限制',e.limits],['证据来源',e.evidence||'待补充']].map(([l,v])=>`<div><div class="tiny muted" style="margin-bottom:6px">${l}</div><div style="white-space:pre-wrap;line-height:1.7">${esc(v)}</div></div>`).join('')}</div><div class="divider"></div><div class="row between"><button class="text-button" data-exp-source>查看来源复盘 →</button><button class="text-button" data-exp-history>修订历史（${e.history?.length||0}）</button></div>${refs.length?`<div class="alert info" style="margin-top:16px">已关联规则：${refs.map(r=>esc(r.name)).join('、')}。经验更新不会自动改变规则。</div>`:''}<div class="drawer-footer"><button class="btn" data-exp-archive>${e.status==='archived'?'恢复可用':'归档'}</button><button class="btn" data-exp-edit>编辑经验</button><button class="btn primary" data-exp-rule ${e.status==='archived'?'disabled title="恢复经验后可创建新规则"':''}>创建检查规则</button></div>`,dialog=>{
+  modal(e.title,`<div class="row between">${badge(e.status==='archived'?'已归档':'参考经验',e.status==='archived'?'gray':'purple')}<span class="tiny muted">修订R${e.revision} · 李明 · ${esc(e.updated)}</span></div><p class="muted">${esc(e.scope)} · ${esc(e.event)}</p><div class="stack">${[['当时判断',e.judgment||'演示快照未提供'],['本次观察',e.observation],['适用条件',e.conditions||'未填写'],['限制',e.limits],['证据来源',e.evidence||'待补充']].map(([l,v])=>`<div><div class="tiny muted" style="margin-bottom:6px">${l}</div><div style="white-space:pre-wrap;line-height:1.7">${esc(v)}</div></div>`).join('')}</div><div class="divider"></div><div class="row between"><button class="text-button" data-exp-source>查看来源复盘 →</button><button class="text-button" data-exp-history>修订历史（${e.history?.length||0}）</button></div>${refs.length?`<div class="alert info" style="margin-top:16px">已关联规则：${refs.map(r=>esc(r.name)).join('、')}。经验更新不会自动改变规则。</div>`:''}<div class="drawer-footer">${relatedTask?'<button class="btn soft" data-exp-diagnosis>查看预测诊断</button>':''}<button class="btn" data-exp-archive>${e.status==='archived'?'恢复可用':'归档'}</button><button class="btn" data-exp-edit>编辑经验</button><button class="btn primary" data-exp-rule ${e.status==='archived'?'disabled title="恢复经验后可创建新规则"':''}>创建检查规则</button></div>`,dialog=>{
+    dialog.querySelector('[data-exp-diagnosis]')?.addEventListener('click',()=>{closeModal();nav('forecast',{taskId:relatedTask.id,tab:'diagnosis'});});
     dialog.querySelector('[data-exp-source]').onclick=()=>{closeModal();ui().tab='history';ui().view='detail';ui().status='done';ui().warehouse=e.warehouse||'all';ui().days=e.days||30;nav('review');};
     dialog.querySelector('[data-exp-edit]').onclick=()=>editExperience(id);
     dialog.querySelector('[data-exp-rule]').onclick=()=>{incomingExperience={id:e.id,revision:e.revision,title:e.title};openRule();};
@@ -220,3 +223,5 @@ function enableRule(id){
     state.opsUI??={homeTab:'open',taskTab:'pending',automationTab:'tasks',filters:{pending:{},all:{}}};state.opsUI.automationTab='rules';save();closeModal();toast(automation(draft.automationId)?.enabled?'规则已启用，将在关联任务下次运行使用':'规则已启用，等待关联任务启用');nav('automation');
   },'确认启用规则');
 }
+
+export function openExperienceLibrary(){const u=ui();u.tab='experience';u.view='list';u.experienceSearch='';u.experienceStatus='active';nav('review');}
