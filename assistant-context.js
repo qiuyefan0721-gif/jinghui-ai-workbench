@@ -7,7 +7,7 @@ const selectedTask=()=>task(state.taskId);
 const autoAdoptedBaseline=t=>!!(t?.confirmed==='V0'&&!t?.candidate&&version(t,'V0')?.autoAdopted);
 const baselineNeedsCheck=t=>!!(autoAdoptedBaseline(t)&&t.diagnosis&&['open','waiting','snoozed'].includes(t.diagnosis.status));
 const forecastLabel=()=>({result:'预测结果',diagnosis:'预测诊断',versions:'版本记录'}[state.tab]||'预测结果');
-const reviewLabel=()=>state.reviewUI?.tab==='experience'?'参考经验':state.reviewUI?.view==='detail'?'复盘详情':'预测复盘';
+const reviewLabel=()=>state.reviewUI?.view==='detail'?'复盘详情':'预测复盘';
 const selectedAutomation=()=>automation(state.automationId)||state.automations?.[0];
 function taskGroups(){
   const all=activeTasks();
@@ -102,10 +102,10 @@ export function contextualAnswer(text){
   if(route==='review'&&/复盘|销量回流|参考经验|下一次预测/.test(q)){
     const u=state.reviewUI||{};
     if(state.stage!=='review')return {text:'当前计划演示日期为2026年9月30日，10月预测周期尚未结束。左侧可切换到独立的2026年11月2日历史复盘演示，查看只读历史快照；它不是当前计划操作的真实未来结果。'};
-    if(/自动影响|下一次预测/.test(q))return {text:'保存参考经验只记录观察、来源和适用条件，不会自动训练模型或改变下一次预测。需要长期提醒时，可另建业务规则草稿，经试运行并明确启用后，再关联持续任务。',action:'rules',label:'查看业务规则'};
+    if(/自动影响|下一次预测/.test(q))return {text:'沉淀后会保留本次复盘结论、来源和适用范围。下次遇到相同商品、区域和仓库，预测诊断会展示相关经验供你参考；具体调整仍需结合本次情况判断。'};
     if(/已保存|参考经验/.test(q)){
       const es=(state.experiences||[]).filter(e=>e.status!=='archived');
-      return {text:es.length?`当前有${es.length}条未归档参考经验：${es.slice(0,3).map(e=>`${e.title}（R${e.revision||1}）`).join('；')}。可在“参考经验”页签查看来源、适用范围和限制；保存记录不会自动调整预测。`:'当前没有未归档的参考经验。完成历史复盘后，可以点击“整理参考经验”，补充观察、适用条件和限制后保存。'};
+      return {text:es.length?`当前有${es.length}条未归档参考经验：${es.slice(0,3).map(e=>`${e.title}（R${e.revision||1}）`).join('；')}。可在预测诊断的“已沉淀的相关经验”中查看结论与来源；保存记录不会自动调整预测。`:'当前没有未归档的参考经验。完成历史复盘后，可以点击“沉淀参考经验”，自动保存复盘结果，无需填写表单。'};
     }
     if(/完整|回流|覆盖/.test(q))return {text:`当前复盘设置为${u.days??30}/30日销量回流，仓库范围为${({shanghai:'上海仓',hangzhou:'杭州仓'})[u.warehouse]||'上海仓、杭州仓'}。${(u.days??30)<30?'只比较已回流的共同日期，缺失日期不补成0。':'完整周期为10月1日至10月30日。'}可在复盘详情点击数据覆盖按钮检查范围。观测销量可能受缺货等因素影响，不能直接当作潜在需求。`};
     return {text:`当前历史分析状态为${({idle:'待复盘',running:'分析中',done:'已复盘',failed:'分析失败'})[u.status||'idle']||'待复盘'}。${u.status==='done'?'打开复盘详情，先检查销量覆盖范围，再对比总量偏差与逐日偏差；图表可按仓库查看。':u.status==='running'?'请等待本次分析完成，再查看结果。':u.status==='failed'?'可点击重试分析，完成后查看历史结果。':'点击左侧“开始复盘”，完成分析后查看详情。'}总量接近不代表逐日预测同样准确，关联调整记录也不能直接证明因果贡献。`};

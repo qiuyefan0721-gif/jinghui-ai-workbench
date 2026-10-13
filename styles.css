@@ -92,3 +92,7 @@
 .forecast-related-experiences .experience-preview+.experience-preview{margin-top:12px;padding-top:12px;border-top:1px solid #efedf5}
 .forecast-related-experiences .experience-preview h3{margin-bottom:6px}
 .forecast-related-experiences .experience-preview+.experience-actions{margin-top:12px}
+
+.forecast-related-experiences .experience-match-hint{margin:7px 0 12px}
+.forecast-related-experiences .experience-source{font-size:10px;line-height:1.5}
+.forecast-related-experiences .experience-summary strong{font-weight:500;color:#716787}

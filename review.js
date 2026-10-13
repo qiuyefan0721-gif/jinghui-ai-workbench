@@ -14,6 +14,7 @@ function ui() {
   state.reviewUI ??= { tab: 'history', view: 'list', status: 'idle', warehouse: 'all', granularity: 'day', search: '', statusFilter: 'all', experienceSearch: '', experienceStatus: 'active', days: 30, selectedDay: null, sortError: false };
   state.experiences ??= [];
   state.rules ??= [];
+  state.reviewUI.tab='history';
   return state.reviewUI;
 }
 
@@ -40,8 +41,7 @@ export function renderReview() {
   if (u.view === 'detail' && u.tab === 'history' && u.status === 'done') return detailPage();
   return `<div class="page-head"><div><div class="eyebrow">REVIEW & KNOWLEDGE</div><h1 class="page-title">复盘与经验</h1><p class="subtitle">核对真实结果，留下下一次工作可参考的经验。</p></div><div class="head-actions">${badge('历史快照 · 只读','blue')}</div></div>
     <div class="alert info" style="margin-bottom:20px">${icon('info')} 2026年11月2日复盘演示。此处是独立历史数据，不是前一阶段操作的真实未来结果。</div>
-    <div class="tabs"><button class="tab ${u.tab === 'history' ? 'active' : ''}" data-review-tab="history">预测复盘</button><button class="tab ${u.tab === 'experience' ? 'active' : ''}" data-review-tab="experience">参考经验 <span class="tiny">${state.experiences.filter(e => e.status !== 'archived').length}</span></button></div>
-    ${u.tab === 'history' ? historyList() : experienceList()}`;
+    ${historyList()}`;
 }
 
 function historyList() {
@@ -58,16 +58,16 @@ function historyList() {
 function detailPage() {
   const u = ui(), d = data();
   const improvement = d.bp === null ? '—' : fmt(d.bp-d.vp,1);
-  const saved = state.experiences.find(e=>e.sourceKey===`${SOURCE}:${u.warehouse}` && e.status!=='archived');
+  const saved = state.experiences.find(e=>e.sourceKey===`${SOURCE}:${u.warehouse}` && (e.days||30)===u.days && e.status!=='archived');
   return `<button class="text-button" data-review-back style="margin-bottom:16px">${icon('chevronLeft',16)} 返回预测复盘</button>
-  <div class="page-head"><div><div class="eyebrow">FORECAST REVIEW</div><h1 class="page-title">A商品 · 华东区域 · 预测复盘</h1><p class="subtitle">${PERIOD}　${warehouseName()}　历史确认版本 V3</p></div><div class="head-actions"><button class="btn" data-review-integrity>${icon('shield')} ${u.days}/30日已回流</button><button class="btn primary" data-review-experience>${icon('file')} ${saved?'查看参考经验':'整理参考经验'}</button></div></div>
+  <div class="page-head"><div><div class="eyebrow">FORECAST REVIEW</div><h1 class="page-title">A商品 · 华东区域 · 预测复盘</h1><p class="subtitle">${PERIOD}　${warehouseName()}　历史确认版本 V3</p></div><div class="head-actions"><button class="btn" data-review-integrity>${icon('shield')} ${u.days}/30日已回流</button><button class="btn primary" data-review-experience>${icon('file')} ${saved?'已沉淀 · 查看经验':'沉淀参考经验'}</button></div></div>
   <div class="alert ${u.days<30?'warning':'info'}" style="margin-bottom:20px">${icon('info')} ${u.days<30?'部分日期已回流。仅评价两版都有预测和实际值的共同日期，不推断全周期表现。':'独立历史演示快照 · 数据截至2026-10-31 23:59 · 销量可能受缺货限制，不等同于潜在需求。'}</div>
   <div class="toolbar" style="padding:0 0 16px"><span class="muted">${periodHint()}</span><div style="margin-left:auto"><select class="select" data-review-warehouse aria-label="查看仓库"><option value="all" ${u.warehouse==='all'?'selected':''}>全部仓库</option><option value="shanghai" ${u.warehouse==='shanghai'?'selected':''}>上海仓</option><option value="hangzhou" ${u.warehouse==='hangzhou'?'selected':''}>杭州仓</option></select></div></div>
   <div class="grid-4">${metric('实际销量',fmt(d.total),'已回流共同日期 · 件')}${metric('AI基线 V0',fmt(d.bt),`净偏差 ${signed(d.bt-d.total)}件`)}${metric('历史确认 V3',fmt(d.vt),`净偏差 ${signed(d.vt-d.total)}件`)}${metric('总量绝对偏差率',`${pct(d.bp)} → ${pct(d.vp)}`,`改善 ${improvement} 个百分点`)}</div>
   <div class="alert success section-gap">${icon('checkCircle')} ${d.vp < d.bp?'本期确认版本总量更接近实际销量。':'本期确认版本总量偏差未优于基线。'}逐日表现请结合下图检查，不能据此认定某个因素造成销量变化。</div>
   <div class="card section-gap"><div class="card-header"><div><h2 class="section-title">预测与实际销量</h2><p class="tiny muted">${warehouseName()} · ${periodHint()}</p></div><div class="segmented">${[['day','日'],['week','周'],['month','月']].map(([g,l])=>`<button class="btn small ${u.granularity===g?'soft':''}" data-review-granularity="${g}">${l}</button>`).join('')}</div></div><div class="card-body">${reviewChart(d)}<div class="row between" style="flex-wrap:wrap;gap:12px"><span class="tiny muted">按日汇总 WMAPE：基线 <strong>${pct(d.bw,2)}</strong>　确认版本 <strong>${pct(d.vw,2)}</strong></span><button class="text-button" data-review-formula>查看计算口径</button></div></div></div>
   <div class="card section-gap" id="review-days"><div class="card-header"><div><h2 class="section-title">逐日核对明细</h2><span class="tiny muted">点击图中日期定位明细；正数表示预测偏高，负数表示预测偏低</span></div><button class="btn small ${u.sortError?'soft':''}" data-review-sort>${icon('filter',15)} ${u.sortError?'恢复日期顺序':'按确认偏差绝对值排序'}</button></div><div class="table-wrap" style="max-height:410px;overflow:auto"><table><thead><tr><th>日期</th><th style="text-align:right">AI基线</th><th style="text-align:right">历史确认</th><th style="text-align:right">实际销量</th><th style="text-align:right">基线净偏差</th><th style="text-align:right">确认净偏差</th></tr></thead><tbody>${d.a.map((n,i)=>({n,i})).sort((a,b)=>u.sortError?Math.abs(d.v[b.i]-b.n)-Math.abs(d.v[a.i]-a.n):a.i-b.i).map(({n,i})=>`<tr data-review-row="${i}" style="${u.selectedDay===i?'background:#f1edff':''}"><td>10/${String(i+1).padStart(2,'0')}${i<7?'<span class="tiny muted"> · 促销周</span>':''}</td><td style="text-align:right">${fmt(d.b[i])}</td><td style="text-align:right">${fmt(d.v[i])}</td><td style="text-align:right">${fmt(n)}</td><td style="text-align:right">${signed(d.b[i]-n)}</td><td style="text-align:right;color:${d.v[i]-n>0?'#b57928':'#538b7c'}">${signed(d.v[i]-n)}</td></tr>`).join('')}</tbody></table></div></div>
-  <div class="card section-gap"><div class="card-header"><div><h2 class="section-title">调整记录回看</h2><p class="tiny muted">关联记录不能直接解释因果贡献</p></div>${badge('历史只读','gray')}</div><div class="card-body"><div class="row between"><div><strong>国庆促销假设 +10%</strong><p class="muted">10月1—7日 · 基于V0生成历史V3 · 全部两仓合计增加620件</p></div><button class="btn" data-review-adjustment>查看当时调整 ${icon('arrow',15)}</button></div><div class="divider"></div><div class="row between"><div><strong>把有边界的观察留下来</strong><p class="tiny muted">保存参考经验不代表模型已学习，也不自动改变下一次预测。</p></div><button class="btn soft" data-review-experience>${saved?'已保存 · 查看经验':'整理参考经验'}</button></div></div></div>`;
+  <div class="card section-gap"><div class="card-header"><div><h2 class="section-title">调整记录回看</h2><p class="tiny muted">关联记录不能直接解释因果贡献</p></div>${badge('历史只读','gray')}</div><div class="card-body"><div class="row between"><div><strong>国庆促销假设 +10%</strong><p class="muted">10月1—7日 · 基于V0生成历史V3 · 全部两仓合计增加620件</p></div><button class="btn" data-review-adjustment>查看当时调整 ${icon('arrow',15)}</button></div><div class="divider"></div><div class="row between"><div><strong>沉淀本次复盘，供下次参考</strong><p class="tiny muted">自动保存本次结果、来源与适用范围，下次在相关预测诊断中查看参考。</p></div><button class="btn soft" data-review-experience>${saved?'已沉淀 · 查看经验':'沉淀参考经验'}</button></div></div></div>`;
 }
 
 function metric(label, value, foot) {
@@ -87,12 +87,6 @@ function reviewChart(d) {
   chunks.forEach(([start,end],i)=>{const label=u.granularity==='day'?`10/${start+1}`:u.granularity==='month'?'10月':`10/${start+1}—${end}`; if(chunks.length<=6||i%5===0||i===chunks.length-1)svg+=`<text x="${x(i)}" y="${h-12}" text-anchor="middle" fill="#979aaf" font-size="11">${label}</text>`;svg+=`<rect x="${x(i)-Math.max(6,(w-left-right)/Math.max(chunks.length,1)/2)}" y="${top}" width="${Math.max(12,(w-left-right)/Math.max(chunks.length,1))}" height="${h-top-bottom}" fill="transparent" style="cursor:pointer" tabindex="0" role="button" data-review-day="${start}" aria-label="查看${label}明细"><title>${label}\n${series.map(s=>`${s.name}：${fmt(s.values[i])}件`).join('\n')}</title></rect>`;});
   svg+='</svg>';
   return `<div class="row" style="justify-content:flex-end;gap:20px;margin-bottom:6px">${series.map(s=>`<span class="tiny" style="color:${s.color}">● ${s.name}</span>`).join('')}</div>${svg}`;
-}
-
-function experienceList() {
-  const u=ui();
-  const rows=state.experiences.filter(e=>(u.experienceStatus==='all'||(u.experienceStatus==='archived'?e.status==='archived':e.status!=='archived'))&&(!u.experienceSearch||`${e.title} ${e.scope} ${e.event}`.includes(u.experienceSearch)));
-  return `<div class="card section-gap"><div class="toolbar"><div style="flex:1">${input('experience-search',u.experienceSearch,'placeholder="搜索经验标题、适用范围或事件" aria-label="搜索参考经验"')}</div><select class="select" data-experience-status><option value="active" ${u.experienceStatus==='active'?'selected':''}>可用经验</option><option value="archived" ${u.experienceStatus==='archived'?'selected':''}>已归档</option><option value="all" ${u.experienceStatus==='all'?'selected':''}>全部</option></select></div>${rows.length?`<div class="table-wrap"><table><thead><tr><th>参考经验</th><th>适用范围</th><th>来源周期</th><th>修订</th><th>状态</th><th>操作</th></tr></thead><tbody>${rows.map(e=>`<tr><td><strong>${esc(e.title)}</strong><div class="tiny muted" style="margin-top:6px">${esc(e.event)} · ${e.demo?'演示案例':'李明保存'}</div></td><td>${esc(e.scope)}</td><td>${e.demo?esc(e.sourceLabel):'2026年10月'}</td><td>R${e.revision}</td><td>${badge(e.status==='archived'?'已归档':'可参考',e.status==='archived'?'gray':'green')}</td><td><button class="text-button" data-experience-view="${e.id}">查看经验 →</button></td></tr>`).join('')}</tbody></table></div>`:empty('没有符合条件的参考经验','从历史复盘整理观察，并保存适用条件和限制。','<button class="btn soft" data-review-tab="history">前往预测复盘</button>')}<div class="card-body tiny muted">参考经验保留来源与修订；归档不会删除历史引用或停用关联规则。</div></div>`;
 }
 
 function resumeAnalysis() {
@@ -119,7 +113,7 @@ export function bindReview(root) {
   root.querySelector('[data-review-integrity]')?.addEventListener('click',()=>modal('销量数据覆盖情况',`<div class="alert info">${ui().days}/30日已回流 · ${warehouseName()}</div><p>数据截至2026-10-31 23:59。仅计算实际销量已回流、且两版预测均有值的共同日期。缺失值不会补成0。</p><p class="muted">销量可能受缺货等因素限制，不能把观测销量直接等同潜在需求。</p><div class="divider"></div><p class="tiny muted">本地演示数据状态</p><div class="row"><button class="btn" data-demo-partial>演示仅前20日回流</button><button class="btn soft" data-demo-full>恢复30日完整回流</button></div>`,d=>{d.querySelector('[data-demo-partial]').onclick=()=>{ui().days=20;closeModal();save();};d.querySelector('[data-demo-full]').onclick=()=>{ui().days=30;closeModal();save();};}));
   root.querySelector('[data-review-formula]')?.addEventListener('click',()=>modal('两个不同的评价口径','<div class="stack"><div class="card card-body"><strong>总量绝对偏差率</strong><p>|预测总量 − 实际销量总量| ÷ 实际销量总量。</p><p class="muted">正负偏差可在汇总中抵消，仅评价总量是否接近。</p></div><div class="card card-body"><strong>按日汇总 WMAPE</strong><p>Σ |每日预测 − 每日实际销量| ÷ Σ 每日实际销量。</p><p class="muted">各日先取绝对值再汇总。切换周/月展示，不改变按日评价口径。</p></div><p class="tiny muted">数据仅在同一对象、同一共同日期范围比较。实际销量为0时显示无法计算。</p></div>'));
   root.querySelector('[data-review-adjustment]')?.addEventListener('click',()=>modal('历史调整与确认记录',`<div class="alert info">只读历史快照 · ${PERIOD}</div><div class="detail-grid" style="margin-top:20px"><div class="kv"><span class="muted">父版本</span><strong>AI基线 V0 · 12,400件</strong></div><div class="kv"><span class="muted">历史确认</span><strong>V3 · 13,020件</strong></div><div class="kv"><span class="muted">调整范围</span><strong>两仓 · 10月1—7日</strong></div><div class="kv"><span class="muted">数量变化</span><strong>6,200 × 10% = +620件</strong></div></div><div class="divider"></div><p><strong>来源情景：</strong>扩量方案</p><p><strong>当时活动证据原文：</strong>演示快照未提供</p><p><strong>接受风险理由原文：</strong>演示快照未提供</p><div class="alert warning">当时的+10%仍高于历史参考上限9%。不能用事后销量为当时的证据补齐或反推合理性。</div>`));
-  root.querySelectorAll('[data-review-experience]').forEach(b=>b.onclick=()=>{const e=state.experiences.find(e=>e.sourceKey===`${SOURCE}:${ui().warehouse}`&&e.status!=='archived');e?viewExperience(e.id):editExperience();});
+  root.querySelectorAll('[data-review-experience]').forEach(b=>b.onclick=()=>captureExperience());
   root.querySelectorAll('[data-experience-view]').forEach(b=>b.onclick=()=>viewExperience(b.dataset.experienceView));
 }
 
@@ -139,37 +133,22 @@ function seedExperience(){
   return {title:'促销期调整的参考记录',scope:`华东 · A商品 · ${warehouseName()}`,event:'国庆促销',judgment:'',observation:`${periodHint()}。历史确认版本${fmt(d.vt)}件与基线${fmt(d.bt)}件对比，本期实际销量${fmt(d.total)}件，总量绝对偏差率由${pct(d.bp)}变为${pct(d.vp)}；逐日表现需另看。`,conditions:'用于商品、渠道与活动力度相近的业务核对，先检查数据和活动覆盖。',limits:'单次复盘不能证明促销假设的因果效果，+10%不能直接复用。',evidence:'',sourceKey:`${SOURCE}:${ui().warehouse}`,warehouse:ui().warehouse,days:ui().days};
 }
 
-function editExperience(id=null){
-  if(state.stage!=='review'){toast('请先进入独立历史复盘演示','error');return;}
-  const existing=state.experiences.find(e=>e.id===id), seed=existing?{...existing}:seedExperience();
-  const keys=['title','scope','event','judgment','observation','conditions','limits','evidence'];
-  modal(existing?'编辑参考经验':'整理参考经验',`<div class="alert info">来源：A商品 · 2026年10月 · 历史V3 · 独立复盘快照。保存不会训练模型、修改预测或启用任务。</div><form data-experience-form style="margin-top:20px"><div class="form-grid">${field('经验标题 *',input('title',seed.title))}${field('适用范围 *',input('scope',seed.scope))}${field('业务事件',input('event',seed.event))}${field('证据来源 / 链接',input('evidence',seed.evidence),'仅记录来源，不自动读取外部内容。')}<div class="full">${field('当时判断',textarea('judgment',seed.judgment,2),'快照未提供证据原文，请按实际信息填写。')}</div><div class="full">${field('本次观察 *',textarea('observation',seed.observation),'编辑后的内容标为人工整理；请保持与数据一致。')}</div><div class="full">${field('适用条件',textarea('conditions',seed.conditions,2))}</div><div class="full">${field('限制与不确定性 *',textarea('limits',seed.limits,2))}</div></div><p class="tiny muted">${periodHint()} · ${warehouseName()} · 来源版本不可修改。</p><div data-form-error class="alert warning" hidden></div><div data-editor-footer><div class="drawer-footer"><button type="button" class="btn" data-editor-cancel>取消</button><button class="btn primary" type="submit">${existing?'保存新修订':'保存参考经验'}</button></div></div></form>`,dialog=>{
-    const form=dialog.querySelector('form');const collect=()=>Object.fromEntries(keys.map(k=>[k,form.elements[k].value.trim()]));const initial=JSON.stringify(collect());
-    guardEditor(dialog,()=>JSON.stringify(collect())!==initial);
-    form.onsubmit=e=>{e.preventDefault();const values=collect(),err=dialog.querySelector('[data-form-error]');const missing=['title','scope','observation','limits'].find(k=>!values[k]);if(missing){err.hidden=false;err.textContent='请补齐标题、适用范围、本次观察和限制。';form.elements[missing].focus();return;}
-      const button=form.querySelector('[type="submit"]');button.disabled=true;
-      if(state.demoFailure){state.demoFailure=false;save();button.disabled=false;err.hidden=false;err.textContent='演示保存失败，输入已保留。请再次点击保存重试。';return;}
-      const target=existing||state.experiences.find(x=>x.sourceKey===seed.sourceKey);
-      if(target&&keys.every(k=>(target[k]||'')===values[k])){closeModal();toast('相同来源与内容已保存，打开已有经验');viewExperience(target.id);return;}
-      if(target){target.history??=[];target.history.push({...Object.fromEntries(keys.map(k=>[k,target[k]||''])),revision:target.revision,updated:target.updated});Object.assign(target,values,{revision:target.revision+1,updated:dateLabel(),status:'active'});}else state.experiences.push({...seed,...values,id:`E${String(state.experiences.length+1).padStart(3,'0')}`,revision:1,status:'active',history:[],updated:dateLabel(),created:dateLabel(),stage:'review'});
-      const saved=target||state.experiences[state.experiences.length-1];save();closeModal();toast(target?'参考经验已保存新修订，关联规则未自动改变':'参考经验已保存，可在相关预测诊断查看');viewExperience(saved.id);
-    };
-  },{wide:true});
+function captureExperience(){
+ const u=ui();if(state.stage!=='review'||u.status!=='done')return toast('请先完成预测复盘','info');
+ const seed=seedExperience(),existing=state.experiences.find(e=>e.sourceKey===seed.sourceKey&&(e.days||30)===seed.days&&e.status!=='archived');
+ if(existing){viewExperience(existing.id);return;}
+ if(state.demoFailure){state.demoFailure=false;save();toast('本次沉淀失败，请再次点击重试','error');return;}
+ const entry={...seed,title:`A商品 · ${warehouseName()} · 10月复盘经验${u.days<30?`（前${u.days}日）`:""}`,id:'E'+Date.now().toString(36),revision:1,status:'active',history:[],created:dateLabel(),updated:dateLabel(),stage:state.stage,captured:true,sourceLabel:`2026年10月历史复盘 · V3 · ${warehouseName()} · 10月1—${u.days}日`,judgment:'促销周需求在V0基础上上调10%，其他日期保持不变。',evidence:'独立历史复盘快照：预测V0、历史确认V3与已回流实际销量。'};
+ state.experiences.push(entry);save();toast('参考经验已沉淀，下次可在相关预测诊断中参考');
 }
 
 export function viewExperience(id){
-  const e=state.experiences.find(e=>e.id===id);if(!e)return;
-  if(e.demo){modal(e.title,`<div class="alert info">演示参考经验 · 以下内容为模拟案例，仅用于展示产品交互。</div><p class="muted">${esc(e.scope)}</p><div class="stack">${[['案例来源',e.sourceLabel],['业务事件',e.event],['当时判断',e.judgment],['本次观察',e.observation],['适用条件',e.conditions],['限制',e.limits]].map(([label,value])=>`<div><div class="tiny muted">${label}</div><p style="line-height:1.7">${esc(value)}</p></div>`).join('')}</div><div class="drawer-footer"><button class="btn primary" data-close>关闭详情</button></div>`,()=>{},{wide:true});return;}
-  const relatedTask=[task(),...state.tasks].find(t=>t?.status==='success'&&!t.archived&&relatedExperiences(t).some(item=>item.id===id));
-  const refs=state.rules.filter(r=>(r.origins||[]).some(o=>o.id===id)||r.draft?.origin?.id===id);
-  modal(e.title,`<div class="row between">${badge(e.status==='archived'?'已归档':'参考经验',e.status==='archived'?'gray':'purple')}<span class="tiny muted">修订R${e.revision} · 李明 · ${esc(e.updated)}</span></div><p class="muted">${esc(e.scope)} · ${esc(e.event)}</p><div class="stack">${[['当时判断',e.judgment||'演示快照未提供'],['本次观察',e.observation],['适用条件',e.conditions||'未填写'],['限制',e.limits],['证据来源',e.evidence||'待补充']].map(([l,v])=>`<div><div class="tiny muted" style="margin-bottom:6px">${l}</div><div style="white-space:pre-wrap;line-height:1.7">${esc(v)}</div></div>`).join('')}</div><div class="divider"></div><div class="row between"><button class="text-button" data-exp-source>查看来源复盘 →</button><button class="text-button" data-exp-history>修订历史（${e.history?.length||0}）</button></div>${refs.length?`<div class="alert info" style="margin-top:16px">已关联规则：${refs.map(r=>esc(r.name)).join('、')}。经验更新不会自动改变规则。</div>`:''}<div class="drawer-footer">${relatedTask?'<button class="btn soft" data-exp-diagnosis>查看预测诊断</button>':''}<button class="btn" data-exp-archive>${e.status==='archived'?'恢复可用':'归档'}</button><button class="btn" data-exp-edit>编辑经验</button><button class="btn primary" data-exp-rule ${e.status==='archived'?'disabled title="恢复经验后可创建新规则"':''}>创建检查规则</button></div>`,dialog=>{
-    dialog.querySelector('[data-exp-diagnosis]')?.addEventListener('click',()=>{closeModal();nav('forecast',{taskId:relatedTask.id,tab:'diagnosis'});});
-    dialog.querySelector('[data-exp-source]').onclick=()=>{closeModal();ui().tab='history';ui().view='detail';ui().status='done';ui().warehouse=e.warehouse||'all';ui().days=e.days||30;nav('review');};
-    dialog.querySelector('[data-exp-edit]').onclick=()=>editExperience(id);
-    dialog.querySelector('[data-exp-rule]').onclick=()=>{incomingExperience={id:e.id,revision:e.revision,title:e.title};openRule();};
-    dialog.querySelector('[data-exp-archive]').onclick=()=>confirmDialog(e.status==='archived'?'恢复参考经验':'归档参考经验',e.status==='archived'?'恢复后可供未来匹配场景参考。':'归档后不再主动推荐。已有引用和关联规则继续保留，不会暂停规则。',()=>{e.status=e.status==='archived'?'active':'archived';save();closeModal();toast(e.status==='archived'?'经验已归档，关联规则保持原状态':'经验已恢复');},e.status==='archived'?'恢复':'归档');
-    dialog.querySelector('[data-exp-history]').onclick=()=>modal('参考经验修订历史',`<div class="stack">${[{...e},...(e.history||[]).slice().reverse()].map(h=>`<div class="card card-body"><div class="row between"><strong>R${h.revision}${h.revision===e.revision?' · 当前修订':''}</strong><span class="tiny muted">${esc(h.updated)}</span></div><p>${esc(h.observation)}</p><p class="tiny muted">限制：${esc(h.limits)}</p></div>`).join('')}</div><div class="drawer-footer"><button class="btn" data-history-back>返回经验</button></div>`,d=>d.querySelector('[data-history-back]').onclick=()=>viewExperience(id),{wide:true});
-  },{wide:true});
+ const e=state.experiences.find(e=>e.id===id);if(!e)return;
+ const relatedTask=[task(),...state.tasks].find(t=>t?.status==='success'&&!t.archived&&relatedExperiences(t).some(item=>item.id===id));
+ modal(e.title,`<div class="row between">${badge(e.demo?'演示经验':'已沉淀参考经验',e.demo?'gray':'purple')}<span class="tiny muted">${esc(e.updated||e.created||'')}</span></div><p class="muted">${esc(e.scope)}</p><div class="stack">${[['本次复盘结论',e.observation],['下次如何参考',e.conditions||'在商品、仓库与活动条件相近时，结合本次结果核对。'],['参考边界',e.limits],['来源',e.sourceLabel||`2026年10月历史复盘 · V3 · 10月1—${e.days||30}日`]].map(([label,value])=>`<div><div class="tiny muted">${label}</div><p style="white-space:pre-wrap;line-height:1.8">${esc(value||'')}</p></div>`).join('')}</div><div class="drawer-footer">${!e.demo?'<button class="btn" data-exp-source>查看来源复盘</button>':''}${relatedTask?'<button class="btn soft" data-exp-diagnosis>查看预测诊断</button>':''}<button class="btn primary" data-close>关闭</button></div>`,dialog=>{
+ dialog.querySelector('[data-exp-diagnosis]')?.addEventListener('click',()=>{closeModal();nav('forecast',{taskId:relatedTask.id,tab:'diagnosis'});});
+ dialog.querySelector('[data-exp-source]')?.addEventListener('click',()=>{closeModal();const u=ui();u.view='detail';u.status='done';u.warehouse=e.warehouse||'all';u.days=e.days||30;nav('review');});
+ },{wide:true});
 }
 
 function ruleValues(r){return {name:r?.name||'促销假设超过参考范围时提醒核对',threshold:r?.threshold??9,scope:r?.scope||'商家A · 华东 · A商品 · 上海仓、杭州仓',evidenceMissing:r?.evidenceMissing??true,automationId:r?.automationId===null?null:(r?.automationId||state.automations[0]?.id||null),origin:r?.origin||null};}
@@ -225,4 +204,7 @@ function enableRule(id){
   },'确认启用规则');
 }
 
-export function openExperienceLibrary(){const u=ui();u.tab='experience';u.view='list';u.experienceSearch='';u.experienceStatus='active';nav('review');}
+export function openExperienceLibrary(){
+ const entries=relatedExperiences(task());
+ modal('已沉淀的相关经验',entries.length?`<div class="stack">${entries.map(e=>`<div class="card card-body"><h3>${esc(e.title)}</h3><p class="tiny muted">${esc(e.scope)}${e.demo?' · 演示案例':''}</p><p>${esc(e.observation)}</p><button class="text-button" data-experience-view="${esc(e.id)}">查看参考详情 →</button></div>`).join('')}</div>`:'<p class="muted">暂无相关经验。完成复盘后点击“沉淀参考经验”，相同商品与仓库的诊断中会展示参考。</p>',dialog=>dialog.querySelectorAll('[data-experience-view]').forEach(b=>b.onclick=()=>viewExperience(b.dataset.experienceView)),{wide:true});
+}

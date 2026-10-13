@@ -21,9 +21,10 @@ function matchExperience(e,t){
 
 // Read only from the active stage's in-memory collection; never load other snapshots.
 export function relatedExperiences(t){
- return (state.experiences||[]).filter(e=>matchExperience(e,t)).slice().sort((a,b)=>String(b.updated||b.created||'').localeCompare(String(a.updated||a.created||'')));
+ return (state.experiences||[]).filter(e=>matchExperience(e,t)).slice().sort((a,b)=>Number(!!a.demo)-Number(!!b.demo)||String(b.updated||b.created||'').localeCompare(String(a.updated||a.created||'')));
 }
 function periodLabel(e,t){
+ if(e.demo)return {text:'模拟案例 · 仅演示参考方法',tone:'gray'};
  const source=sourceParts(e),start=String(t.form?.start||t.period||'').match(/\d{4}-\d{2}/)?.[0];
  const end=String(t.form?.end||t.period||'').match(/\d{4}-\d{2}/g)?.at(-1)||start;
  if(!source?.month)return {text:'来源周期待核实 · 仅供参考',tone:'gray'};
@@ -33,9 +34,12 @@ function periodLabel(e,t){
 }
 
 export function renderRelatedExperiences(t){
- const matches=relatedExperiences(t),e=matches[0],canBrowse=state.stage==='review';
- const heading=`<div class="between"><span class="eyebrow">相关参考经验</span>${badge(matches.length,'purple')}</div>`;
- const browse=canBrowse?`<button class="text-button" data-diagnosis-experience-list>${e?'查看全部':'前往整理'} ${icon('arrow',13)}</button>`:'';
- if(!e)return `<section class="card forecast-related-experiences"><div class="card-body">${heading}<h3>暂无匹配的参考经验</h3><p class="tiny muted experience-summary">保存与当前商品、区域和仓库匹配的经验后，将在这里展示。</p><div class="experience-actions">${browse||'<span class="tiny muted">可在历史复盘演示中整理</span>'}</div></div></section>`;
- return `<section class="card forecast-related-experiences"><div class="card-body">${heading}${matches.slice(0,2).map(item=>`<div class="experience-preview"><h3 class="experience-title" title="${esc(item.title)}">${esc(item.title||'未命名参考经验')}</h3><p class="tiny muted experience-summary">${item.demo?'演示案例 · ':''}${esc(item.observation||'查看经验详情了解适用条件。')}</p><button class="text-button" data-diagnosis-experience="${esc(item.id)}">查看详情 ${icon('arrow',13)}</button></div>`).join('')}${browse?`<div class="experience-actions">${browse}</div>`:''}</div></section>`;
+ const matches=relatedExperiences(t);
+ const heading=`<div class="between"><span class="eyebrow">已沉淀的相关经验</span>${badge(matches.length,'purple')}</div>`;
+ if(!matches.length)return `<section class="card forecast-related-experiences"><div class="card-body">${heading}<h3>暂无相关经验</h3><p class="tiny muted experience-summary">复盘完成后点击「沉淀参考经验」，下次遇到相同商品、区域和仓库时，可在这里参考。</p></div></section>`;
+ return `<section class="card forecast-related-experiences"><div class="card-body">${heading}<p class="tiny muted experience-match-hint">按当前商品、区域和仓库匹配</p>${matches.slice(0,2).map(item=>{
+  const matched=matchExperience(item,t),source=sourceParts(item),period=periodLabel(item,t);
+  const sourceLabel=item.demo?(item.sourceLabel||'模拟案例 · 非真实复盘'):(item.sourceLabel||(source?`${source.month}复盘 · ${source.version}`:'历史沉淀记录'));
+  return `<div class="experience-preview"><h3 class="experience-title" title="${esc(item.title)}">${esc(item.title||'未命名参考经验')}</h3><p class="tiny muted experience-summary experience-source" title="${esc(sourceLabel)}">来源：${esc(sourceLabel)}</p><p class="tiny muted experience-summary"><strong>本次观察：</strong>${esc(item.observation||'查看详情了解本次复盘结果。')}</p><p class="tiny muted experience-summary"><strong>下次参考：</strong>${esc(item.conditions||'核实业务条件相近后，参考本次复盘的处理方法。')}</p><p class="tiny muted experience-source" title="${esc([matched.product,matched.region,...matched.warehouses].join(' · '))}">${esc(period.text)}</p><button class="text-button" data-diagnosis-experience="${esc(item.id)}">查看详情 ${icon('arrow',13)}</button></div>`;
+ }).join('')}<div class="experience-actions"><button class="text-button" data-diagnosis-experience-list>查看全部 ${icon('arrow',13)}</button></div></div></section>`;
 }
