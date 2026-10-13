@@ -20,6 +20,21 @@ export function forecastScopeError(d={}){
   const warehouses=d.warehouses||[];
   return d.start==='2026-10-01'&&d.end==='2026-10-30'&&d.product==='A商品'&&d.region==='华东'&&warehouses.length===2&&warehouses.includes('上海仓')&&warehouses.includes('杭州仓')?'':'当前原型仅提供华东 A商品、上海仓和杭州仓、2026-10-01 至 2026-10-30 的演示数据。请修改条件后计算；其他范围可保存草稿。';
 }
+// Adopt only an untouched first system forecast; later candidates stay explicit.
+export function autoAdoptInitialForecast(t){
+  const v=t.versions?.[0];
+  if(t.status!=='success'||t.versions?.length!==1||v?.id!=='V0'||v.parent||v.confirmedAt||v.confirmation||Number(v.rate||0)!==0||!['AI基线','系统初始预测'].includes(v.source)||t.confirmed||(t.candidate&&t.candidate!=='V0'))return false;
+  t.confirmed='V0';t.candidate=null;t.viewed='V0';v.autoAdopted=true;
+  v.adoptedAt=v.created;v.source='系统初始预测';
+  const d=t.diagnosis;
+  if(d?.version==='V0'){
+    d.autoAdopted=true;
+    // Only retire the old default confirmation prompt; keep deliberate user follow-ups.
+    if(d.kind==='baseline'&&d.status==='open'&&!d.evidence&&!d.source&&!d.reason&&!d.remind&&(d.history||[]).every(h=>/计算完成|同步检查预测数据/.test(typeof h==='string'?h:h.text||'')))d.status='resolved';
+    d.history??=[];d.history.push({text:'系统初始预测 V0 已自动采用，无需重复确认',time:v.created||'09-30 09:02'});
+  }
+  return true;
+}
 // Add a version-bound diagnosis without replacing existing business decisions.
 export function ensureForecastDiagnosis(t){
   if(t.status!=='success'||t.diagnosis)return false;
@@ -27,16 +42,17 @@ export function ensureForecastDiagnosis(t){
   if(!v)return false;
   const confirmed=t.confirmed===v.id,confirmation=confirmed?v.confirmation:null;
   t.diagnosis={id:'D'+t.id+v.id,version:v.id,kind:v.id==='V0'?'baseline':'adjustment',
-    status:confirmed?((v.rate||0)>9?'accepted':'resolved'):'open',
+    status:confirmed?((v.rate||0)>9?'accepted':'resolved'):'open',autoAdopted:!!v.autoAdopted,
     evidence:confirmation?.evidence||'',source:confirmation?.source||'',reason:confirmation?.reason||'',
     ruleSnapshot:structuredClone(state.rules.find(r=>r.status==='enabled')||null),
-    history:[{text:confirmed?'已补全诊断记录，保留原业务确认结论':'计算完成，同步检查预测数据；活动依据待业务核实',time:v.created||'09-30 09:02'}]};
+    history:[{text:v.autoAdopted?'计算完成，基础检查通过；系统初始预测 V0 已自动采用':confirmed?'已补全诊断记录，保留原业务确认结论':'计算完成，同步检查预测数据；活动依据待业务核实',time:v.created||'09-30 09:02'}]};
   return true;
 }
 export function resumeForecastRuns(){
   forecastTimers.forEach(clearTimeout);forecastTimers.clear();
   let changed=false;
   for(const t of state.tasks){
+    if(autoAdoptInitialForecast(t))changed=true;
     if(ensureForecastDiagnosis(t))changed=true;
     let run=t.runHistory?.[0];
     // Older builds marked an interrupted job failed without updating its run record.
@@ -62,8 +78,8 @@ export function resumeForecastRuns(){
         t.scenarios=[{id:'S1',name:'谨慎方案',rate:8,status:'idle',total:null,version:null},{id:'S2',name:'扩量方案',rate:10,status:'idle',total:null,version:null}];
       }
       t.status=run.status='success';delete t.error;
-      ensureForecastDiagnosis(t);
-      save();toast(`${t.name} 计算完成，请确认采用版本`);
+      autoAdoptInitialForecast(t);ensureForecastDiagnosis(t);
+      save();toast(`${t.name} 计算完成${t.versions?.[0]?.autoAdopted&&!t.candidate?'，V0 已自动采用':'，请查看预测结果'}`);
     };
     forecastTimers.set(t.id,setTimeout(complete,Math.max(0,run.completeAt-Date.now())));
   }
@@ -79,7 +95,7 @@ let focusOrigin;export function closeModal(){document.querySelector('#dialog')?.
 export function modal(title,html,onMount=null,{wide=false}={}){focusOrigin=document.activeElement;document.querySelector('#dialog')?.remove();let d=document.createElement('div');d.id='dialog';d.className='modal-backdrop';d.innerHTML=`<section class="modal ${wide?'wide':''}" role="dialog" aria-modal="true" aria-label="${esc(title)}"><header class="modal-head"><div><span class="eyebrow">京慧 · 工作空间</span><h2>${esc(title)}</h2></div><button class="btn icon-only close-modal" aria-label="关闭">${icon('x')}</button></header><div class="modal-content">${html}</div></section>`;document.body.append(d);document.body.classList.add('modal-open');let dirty=false;d.addEventListener('input',()=>dirty=true);const dismiss=()=>{if(dirty&&!window.confirm('有尚未保存的修改，确定放弃并关闭吗？'))return;closeModal()};d.querySelector('.close-modal').onclick=dismiss;d.addEventListener('click',e=>{if(e.target===d||e.target.closest('[data-close]'))dismiss()});d.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();dismiss()}if(e.key==='Tab'){const a=[...d.querySelectorAll('button:not([disabled]),input,select,textarea,[tabindex="0"]')];if(e.shiftKey&&document.activeElement===a[0]){e.preventDefault();a.at(-1)?.focus()}else if(!e.shiftKey&&document.activeElement===a.at(-1)){e.preventDefault();a[0]?.focus()}}});onMount?.(d);setTimeout(()=>d.querySelector('input,textarea,select,button')?.focus(),40);return d}
 export function confirmDialog(title,description,onConfirm,label='确认'){modal(title,`<div class="alert info">${description}</div><div class="drawer-footer"><button class="btn" data-close>取消</button><button class="btn primary" id="confirm-dialog">${label}</button></div>`,d=>d.querySelector('#confirm-dialog').onclick=()=>{closeModal();onConfirm()})}
 export function chart(series,{height=250,compact=false,labels=true,dayOffset=0,grain='day'}={}){const W=900,H=height,L=compact?16:46,R=20,T=20,B=labels?32:10,vals=series.flatMap(s=>s.data),max=Math.max(100,...vals)*1.12,count=Math.max(1,...series.map(s=>s.data.length)),step=(W-L-R)/Math.max(1,count-1),y=v=>H-B-v/max*(H-T-B);return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="需求预测趋势对比"><defs><linearGradient id="area-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#8466ee" stop-opacity=".17"/><stop offset="100%" stop-color="#8466ee" stop-opacity="0"/></linearGradient></defs>${Array.from({length:5},(_,i)=>{let v=max*i/4;return `<line x1="${L}" y1="${y(v)}" x2="${W-R}" y2="${y(v)}" stroke="#edf0f5" stroke-dasharray="4 5"/>${compact?'':`<text x="${L-10}" y="${y(v)+4}" text-anchor="end" fill="#949aaf" font-size="11">${fmt(v)}</text>`}`}).join('')}<rect x="${L}" y="${T}" width="${Math.min(W-L-R,step*Math.min(count-1,6.5))}" height="${H-T-B}" fill="#f1ecff" opacity=".6"/>${compact?'':`<text x="${L+10}" y="${T+15}" fill="#9b82d4" font-size="10">国庆促销周</text>`}${series.map((s,idx)=>{let p=s.data.map((v,i)=>`${L+i*step},${y(v)}`).join(' ');return `${idx===series.length-1?`<path d="M${L},${H-B} L${p.replaceAll(' ',' L')} L${L+(s.data.length-1)*step},${H-B}Z" fill="url(#area-fill)"/>`:''}<polyline points="${p}" fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linejoin="round" ${idx===0&&series.length>1?'stroke-dasharray="5 5"':''}/>${s.data.map((v,i)=>`<circle data-chart-day="${i}" tabindex="0" cx="${L+i*step}" cy="${y(v)}" r="6" fill="transparent"><title>10月${i+1+dayOffset}日 · ${esc(s.name)}：${fmt(v)}件</title></circle>`).join('')}`}).join('')}${labels?(count===30?[0,4,9,14,19,24,29]:Array.from({length:count},(_,i)=>i)).map(i=>`<text x="${L+i*step}" y="${H-7}" text-anchor="middle" fill="#949aaf" font-size="11">${grain==='month'?'10月':grain==='week'?`10/${i*7+1+dayOffset}—${Math.min(30,(i+1)*7+dayOffset)}`:`10/${String(i+1+dayOffset).padStart(2,'0')}`}</text>`).join(''):''}</svg><div class="chart-legend">${series.map(s=>`<span><i style="background:${s.color}"></i>${esc(s.name)}</span>`).join('')}<span class="muted">单位：件</span></div></div>`}
-export const pendingTasks=()=>state.tasks.filter(t=>t.candidate&&!t.archived);
+export const pendingTasks=()=>state.tasks.filter(t=>!t.archived&&(t.candidate||(t.diagnosis?.version===t.confirmed&&['open','waiting','snoozed'].includes(t.diagnosis.status))));
 export function openEvidence(){modal('促销假设 · 判断依据',`<div class="alert warning">当前为事前风险提示。历史参考不能证明本次活动一定高估。</div><h3>历史可比活动 · 演示样本</h3><div class="table-wrap"><table><thead><tr><th>参考样本</th><th>匹配范围</th><th>活动增幅</th></tr></thead><tbody>${[7,8,9].map((v,i)=>`<tr><td>历史活动 0${i+1}</td><td>A商品 · 同类渠道</td><td>${v}%</td></tr>`).join('')}</tbody></table></div><div class="section-gap"><h3>仍需核实</h3><p class="muted">本次促销的渠道覆盖、活动力度，以及与历史样本的可比性。</p></div><div class="drawer-footer"><button class="btn primary" data-close>我知道了</button></div>`)}
 export function openSettings(){window.dispatchEvent(new Event('app:settings'))}
 export function addVersion(t,data,meta={}){const id='V'+(Math.max(-1,...t.versions.map(v=>Number(v.id.slice(1))))+1);const v={id,data,total:sum(data),source:'情景模拟',parent:'V0',reason:'情景调整',created:'09-30 09:00',...meta};t.versions.push(v);t.viewed=id;t.candidate=id;const old=t.diagnosis;if(old){t.diagnosisHistory??=[];t.diagnosisHistory.push(structuredClone(old))}t.diagnosis={id:'D'+t.id+id,version:id,status:v.rate>9||!old?.evidence?'open':'resolved',evidence:old?.evidence||'',source:old?.source||'',reason:'',history:[]};save();return v}

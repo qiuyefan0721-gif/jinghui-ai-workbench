@@ -4,13 +4,15 @@ const suggestion=(text,prompt,icon='sparkles')=>({text,prompt,icon});
 const activeTasks=()=>state.tasks.filter(t=>!t.archived);
 const scopeLabel=t=>[t?.region,t?.product,t?.warehouses?.join('、')].filter(Boolean).join(' · ');
 const selectedTask=()=>task(state.taskId);
+const autoAdoptedBaseline=t=>!!(t?.confirmed==='V0'&&!t?.candidate&&version(t,'V0')?.autoAdopted);
+const baselineNeedsCheck=t=>!!(autoAdoptedBaseline(t)&&t.diagnosis&&['open','waiting','snoozed'].includes(t.diagnosis.status));
 const forecastLabel=()=>({result:'预测结果',diagnosis:'预测诊断',versions:'版本记录'}[state.tab]||'预测结果');
 const reviewLabel=()=>state.reviewUI?.tab==='experience'?'参考经验':state.reviewUI?.view==='detail'?'复盘详情':'预测复盘';
 const selectedAutomation=()=>automation(state.automationId)||state.automations?.[0];
 function taskGroups(){
   const all=activeTasks();
-  const open=all.filter(t=>t.candidate&&t.diagnosis?.version===t.candidate&&t.diagnosis.status==='open');
-  const waiting=all.filter(t=>t.candidate&&t.diagnosis?.version===t.candidate&&['waiting','snoozed'].includes(t.diagnosis.status));
+  const open=all.filter(t=>(t.candidate||t.confirmed)&&t.diagnosis?.version===(t.candidate||t.confirmed)&&t.diagnosis.status==='open');
+  const waiting=all.filter(t=>(t.candidate||t.confirmed)&&t.diagnosis?.version===(t.candidate||t.confirmed)&&['waiting','snoozed'].includes(t.diagnosis.status));
   const ready=all.filter(t=>t.status==='success'&&t.candidate&&(!t.diagnosis||t.diagnosis.version!==t.candidate||!['open','waiting','snoozed'].includes(t.diagnosis.status)));
   return {all,open,waiting,ready,running:all.filter(t=>t.status==='running'),failed:all.filter(t=>t.status==='failed')};
 }
@@ -19,7 +21,7 @@ function taskBrief(){
   return `当前有${g.open.length}项诊断需要核对、${g.ready.length}项候选等待确认、${g.waiting.length}项等待补充信息。${g.running.length?`另有${g.running.length}项预测正在计算。`:''}${g.failed.length?`${g.failed.length}项计算失败，可查看原因后重试。`:''}`;
 }
 export function assistantContext(){
-  const route=state.route||'home',t=selectedTask(),a=selectedAutomation(),stage=state.stage||'plan';
+  const route=state.route||'home',t=selectedTask(),a=selectedAutomation(),stage=state.stage||'plan',adopted=autoAdoptedBaseline(t),needsCheck=baselineNeedsCheck(t);
   let key=[stage,route],title='',intro='',placeholder='告诉我你想了解当前页面的什么',suggestions=[];
   if(route==='home'){
     title='我的工作台';intro=state.settings?.configured?`我会围绕你的待办和工作范围提供帮助。${taskBrief()}`:'先配置负责的商品、仓库和工作偏好，也可以直接发起一次预测。';
@@ -34,14 +36,14 @@ export function assistantContext(){
   }else if(route==='forecast'){
     key.push(state.taskId||'',state.tab||'result',t?.viewed||'');title=t?`${t.name} · ${forecastLabel()}`:forecastLabel();
     if(state.tab==='diagnosis'){
-      intro=t?.diagnosis?`当前诊断绑定${t.diagnosis.version}。我可以帮你核对已补充的信息、仍缺少的依据，以及下一步的检查顺序。`:'可以说明预测诊断检查什么；计算完成后再查看该预测的诊断。';
-      placeholder='例如：当前诊断还缺哪些依据？';suggestions=[suggestion('检查缺少的依据','当前诊断还缺哪些依据？','file'),suggestion('诊断后怎么处理','当前预测诊断下一步怎么处理？','checkCircle'),suggestion('比较调整方案','比较8%和10%两个方案','layers')];
+      intro=adopted&&!needsCheck?'首次生成的V0基线已自动采用，无需补齐活动依据后再次确认。你可以按需补充业务信息，或通过情景模拟比较新的假设。':t?.diagnosis?`当前诊断绑定${t.diagnosis.version}。我可以帮你核对已补充的信息、仍缺少的依据，以及下一步的检查顺序。`:'可以说明预测诊断检查什么；计算完成后再查看该预测的诊断。';
+      placeholder=adopted&&!needsCheck?'例如：当前预测诊断下一步怎么处理？':'例如：当前诊断还缺哪些依据？';suggestions=adopted&&!needsCheck?[suggestion('查看下一步','当前预测诊断下一步怎么处理？','checkCircle'),suggestion('了解版本状态','查看版本、生成草稿和确认版本有什么区别？','layers'),suggestion('比较调整方案','比较8%和10%两个方案','layers')]:[suggestion('检查缺少的依据','当前诊断还缺哪些依据？','file'),suggestion('诊断后怎么处理','当前预测诊断下一步怎么处理？','checkCircle'),suggestion('比较调整方案','比较8%和10%两个方案','layers')];
     }else if(state.tab==='versions'){
-      intro=`这里保留当前预测的版本记录。${t?`当前查看${t.viewed||'暂无'}，已确认${t.confirmed||'暂无'}，待确认${t.candidate||'暂无'}。`:''}可以帮你检查确认前需要核实的内容。`;
-      placeholder='例如：确认版本前需要检查什么？';suggestions=[suggestion('确认前检查','确认版本前需要检查什么？','shield'),suggestion('区分版本状态','查看版本、生成草稿和确认版本有什么区别？','layers'),suggestion('解释当前差异','解释当前预测的变化','chart')];
+      intro=`这里保留当前预测的版本记录。${t?`当前查看${t.viewed||'暂无'}，已确认${t.confirmed||'暂无'}，待确认${t.candidate||'暂无'}。`:''}${adopted?'首次V0已自动采用；后续候选版本需手动确认后替换。':'可以帮你检查确认前需要核实的内容。'}`;
+      placeholder=adopted?'例如：查看版本、生成草稿和确认版本有什么区别？':'例如：确认版本前需要检查什么？';suggestions=[suggestion(adopted?'了解采用状态':'确认前检查',adopted?'当前V0还需要再次确认吗？':'确认版本前需要检查什么？','shield'),suggestion('区分版本状态','查看版本、生成草稿和确认版本有什么区别？','layers'),suggestion('解释当前差异','解释当前预测的变化','chart')];
     }else{
-      const v=t&&version(t);intro=v?`当前查看${v.id}，全期预测${fmt(v.total)}件。可以解释与基线的差异，或配置并运行促销情景。`:'当前预测尚无可查看的计算结果。可以先了解计算状态与后续处理。';
-      placeholder='例如：解释当前预测的变化';suggestions=[suggestion('解释预测变化','解释当前预测的变化','chart'),suggestion('比较8%与10%','比较8%和10%两个方案','layers'),suggestion('确认前检查','确认版本前需要检查什么？','shield')];
+      const v=t&&version(t);intro=v?`当前查看${v.id}，全期预测${fmt(v.total)}件。${adopted?'V0已自动采用，无需再次确认。':''}可以解释与基线的差异，或配置并运行促销情景。`:'当前预测尚无可查看的计算结果。可以先了解计算状态与后续处理。';
+      placeholder='例如：解释当前预测的变化';suggestions=[suggestion('解释预测变化','解释当前预测的变化','chart'),suggestion('比较8%与10%','比较8%和10%两个方案','layers'),suggestion(adopted?'了解采用状态':'确认前检查',adopted?'当前V0还需要再次确认吗？':'确认版本前需要检查什么？','shield')];
     }
   }else if(route==='scenarios'){
     key.push(state.taskId||'');title=t?`${t.name} · 情景模拟`:'情景模拟';intro='你可以用业务语言指定一至两个促销增幅，我会配置左侧方案并运行模拟。计算结果用于比较，生成草稿和确认版本仍需分别操作。';
@@ -66,11 +68,13 @@ function diagnosisAnswer(t){
   if(t.status!=='success')return {text:`该预测${({running:'正在计算',failed:'计算失败',draft:'尚未开始计算',cancelled:'已取消计算'})[t.status]||'暂不可用'}。${t.error||'计算完成后，再检查预测结果与诊断依据。'}`};
   const d=t.diagnosis;
   if(!d)return {text:'当前没有可读取的诊断记录，请返回预测结果检查计算状态。'};
+  if(autoAdoptedBaseline(t)&&!baselineNeedsCheck(t))return {text:`当前诊断绑定${d.version}，首次V0基线已自动采用，无需再次确认。当前没有待处理的候选版本；活动信息与来源可按需补充，不作为使用V0的前置条件。若要调整促销假设，可以先比较情景，再生成候选版本，经核对和手动确认后替换当前采用版本。`};
   const missing=[!d.evidence?'活动说明或数据核对信息':null,!d.source?'信息来源':null,!d.reason?'采用说明或风险接受理由':null].filter(Boolean);
-  return {text:`当前诊断绑定${d.version}，状态为${({open:'需要核对',waiting:'等待补充证据',snoozed:'等待提醒',resolved:'已核对',accepted:'已记录风险接受',replaced:'已被新版替代'})[d.status]||d.status}。${missing.length?`记录中尚缺：${missing.join('、')}。`:'说明、来源和处理理由均已记录，可以结合实际业务核验。'}${['resolved','accepted','replaced'].includes(d.status)?'已有处理记录会保留；补充信息不会自动改动已确认版本。':'可在左侧“补充活动信息”中填写说明与来源，再重新核对；暂时无法补齐时，可设置等待提醒。'}最终确认采用版本仍需由你操作。`};
+  return {text:`当前诊断绑定${d.version}，状态为${({open:'需要核对',waiting:'等待补充证据',snoozed:'等待提醒',resolved:'已核对',accepted:'已记录风险接受',replaced:'已被新版替代'})[d.status]||d.status}。${missing.length?`记录中尚缺：${missing.join('、')}。`:'说明、来源和处理理由均已记录，可以结合实际业务核验。'}${['resolved','accepted','replaced'].includes(d.status)?'已有处理记录会保留；补充信息不会自动改动已确认版本。':'可在左侧“补充活动信息”中填写说明与来源，再重新核对；暂时无法补齐时，可设置等待提醒。'}${autoAdoptedBaseline(t)?'V0已自动采用，当前异常仍需按诊断提示核对；只有生成新的候选版本后才需要手动确认替换。':'最终确认采用候选版本仍需由你操作。'}`};
 }
 function confirmationAnswer(t){
   if(!t)return {text:'请先选择一项预测，再检查它的版本记录。'};
+  if(autoAdoptedBaseline(t))return {text:`首次V0基线已自动采用，无需再点击确认。${baselineNeedsCheck(t)?'当前诊断还有异常或待补充信息，请按诊断提示继续核对。':'业务信息可按需补充，不影响当前V0的采用状态。'}需要调整时，先完成情景计算并生成候选版本，再核对依据、手动确认替换V0。`};
   const candidate=version(t,t.candidate);
   if(!candidate)return {text:`当前没有待确认候选，已确认版本为${t.confirmed||'暂无'}。可以查看历史记录；需要新的假设时，先完成情景计算并生成预测草稿。`};
   return {text:`本任务待确认${candidate.id}，全期${fmt(candidate.total)}件；已确认版本为${t.confirmed||'暂无'}。先核对商品、仓库、日期和逐日差异，再填写活动说明、信息来源与确认理由。${Number(candidate.rate||0)>9?'该候选促销增幅超过9%的演示参考上限，需要明确接受剩余风险。':'数值未超参考上限，也需要核对活动依据。'}点击左侧“对比并确认”完成核验后再确认，当前助手回复不会替你采用版本。`};
@@ -87,12 +91,12 @@ export function contextualAnswer(text){
   if(route==='tasks'&&/先处理|处理顺序|优先/.test(q))return {text:`${taskBrief()}建议先查看计算失败原因，再核对已生成候选的诊断依据；证据齐全后确认版本。正在计算的任务等待结果，等待证据的任务按提醒跟进。这个顺序用于人工检查，不会自动调整任务或确认版本。`};
   if(route==='tasks'&&/不同状态|任务状态/.test(q))return {text:'创建草稿：条件已保存，尚未计算；计算中：正在生成结果；待调整：诊断仍需核对或等待依据；待确认：候选已准备好，需要业务确认；已确认：已有采用版本。计算失败可查看原因后重试，已归档任务保留历史。'};
   if(route==='new'&&/范围|填写示例|输入示例|草稿|开始计算/.test(q)){
-    if(/区别/.test(q))return {text:'保存草稿只保留填写条件，不生成预测结果。开始计算会先校验当前演示是否有对应数据，再生成独立V0基线与预测诊断；结果生成后仍需业务核对确认。'};
+    if(/区别/.test(q))return {text:'保存草稿只保留填写条件，不生成预测结果。开始计算会先校验当前演示是否有对应数据，再生成独立V0基线与预测诊断，并自动采用首次V0，无需再次确认；后续调整产生的候选版本仍需手动确认替换。'};
     return {text:'当前演示可计算范围为：华东、A商品、上海仓和杭州仓、2026年10月1日至10月30日。填写示例：“为A商品生成华东上海仓和杭州仓2026年10月1日至10月30日的需求预测，任务名称为10月需求预测”。请在右侧新建预测卡片核对填写的条件后再开始计算；其他范围可以保存草稿。'};
   }
   if(route==='forecast'&&state.tab==='diagnosis'&&/依据|缺|诊断|下一步/.test(q))return diagnosisAnswer(t);
-  if(route==='forecast'&&/确认版本前|确认前.*检查/.test(q))return confirmationAnswer(t);
-  if(route==='forecast'&&/查看版本.*生成草稿|版本.*区别/.test(q))return {text:'查看版本只切换展示对象；生成草稿创建新的候选与诊断，保留历史版本；确认版本需要核验说明、来源和理由，之后才更新该任务的业务采用版本。三项操作独立进行。'};
+  if(route==='forecast'&&/确认版本前|确认前.*检查|需要再次确认|采用状态/.test(q))return confirmationAnswer(t);
+  if(route==='forecast'&&/查看版本.*生成草稿|版本.*区别/.test(q))return {text:'首次计算生成的V0会自动采用，无需再次确认。查看版本只切换展示对象；后续生成草稿会创建新的候选与诊断，保留当前采用版本和历史记录；确认候选版本需要核验说明、来源和理由，之后才替换该任务的业务采用版本。'};
   if(route==='forecast'&&!version(t)&&/解释.*预测|预测.*变化/.test(q))return diagnosisAnswer(t);
   if(route==='scenarios'&&/完成后|生成草稿和确认/.test(q))return {text:'先等待指定方案显示计算完成，再查看总量与趋势差异。选定方案后点击“生成预测草稿”，填写说明；之后进入版本记录对比，补充活动依据并确认。已生成的历史草稿会保留，修改参数需要重新计算。'};
   if(route==='review'&&/复盘|销量回流|参考经验|下一次预测/.test(q)){
