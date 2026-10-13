@@ -14,3 +14,5 @@
 @media(max-width:960px){.personal-primary-modules{grid-template-columns:1fr}.personal-primary-modules .personal-task-list,.personal-primary-modules .personal-auto-list{max-height:none}}
 
 .personal-brief-section{margin-bottom:18px}.personal-brief-section>.personal-module{margin:0}
+
+.wb-module-picker{display:flex;flex-direction:column;gap:8px}.wb-chat-suggestions button:disabled{opacity:.55;cursor:default}
