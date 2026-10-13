@@ -12,6 +12,7 @@ export function scenarioIntent(text){
  const pair=normalized.match(/(?:比较|对比|对照|改成|换成|调整为|分别)\s*(-?\d+(?:\.\d+)?)\s*%?\s*(?:和|与|及|、|,|\/|vs\.?|跟)\s*(-?\d+(?:\.\d+)?)\s*%?/i);
  if(pair&&rates.length<2)rates=[Number(pair[1]),Number(pair[2])];
  if(/下调|降低/.test(normalized)||rates.some(r=>!Number.isFinite(r)||r<0||r>30))return {error:'当前情景支持促销周0%—30%的上调。请提供此范围内的比例，例如“比较8%和10%两个方案”。左侧配置尚未修改。'};
+ if(rates.some(r=>!Number.isInteger(r)))return {error:'模拟增幅仅支持0%—30%的整数，例如4%、8%。请修改比例后再运行，左侧配置尚未修改。'};
  if(comparison&&(rates.length!==2||rates[0]===rates[1]))return {error:'请指定两个不同的促销周增幅，例如“比较8%和10%两个方案”。左侧配置尚未修改。'};
  if(!comparison&&(!/促销|10月1.*7|1[—至到-]7/.test(normalized)||rates.length!==1))return {error:'请说明促销周的上调比例，例如“促销周上调10%”。当前只调整V0的10月1—7日，其余日期保持不变。'};
  if(/全月|全期|所有日期|其他商品|下个月/.test(normalized))return {error:'当前模拟仅支持本预测V0的促销周，不能按这个范围执行。左侧配置尚未修改。'};

@@ -68,3 +68,16 @@
 .assistant-panel .assistant-forecast-review .kv{gap:8px;padding:5px 0;font-size:7.7px;flex-wrap:wrap}
 .assistant-panel .assistant-forecast-status{display:flex;align-items:flex-start;gap:6px;margin:9px 0 0;color:#8d7aaa;font-size:7.7px;line-height:1.7;overflow-wrap:anywhere}
 .assistant-panel .assistant-forecast-status svg{flex-shrink:0;margin-top:2px}
+
+/* Compact scenario cards vertically without scaling text or clipping content. */
+.scenario-card{padding-block:14px}
+.scenario-card>.section-gap{margin-top:11px}
+.scenario-card .field{gap:5px;margin-bottom:8px}
+.scenario-card>.divider{margin-block:8px}
+.scenario-card>.scenario-value{margin-block:11px 6px}
+.scenario-card>.scenario-actions{margin-top:10px;flex-wrap:wrap}
+.scenario-card-heading{flex:1;min-width:0}
+.scenario-card-heading h2{overflow-wrap:anywhere}
+.scenario-card-tools{display:flex;align-items:center;justify-content:flex-end;gap:7px;flex-shrink:0;flex-wrap:wrap}
+.scenario-card-tools [data-delete-scenario]{flex-shrink:0}
+@media(max-width:700px){.scenario-card>.between{align-items:flex-start;flex-wrap:wrap}.scenario-card-heading{flex-basis:150px}.scenario-card-tools{margin-left:auto}}
