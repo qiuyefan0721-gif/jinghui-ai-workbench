@@ -88,3 +88,7 @@
 .forecast-related-experiences .experience-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .forecast-related-experiences .experience-summary{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
 .forecast-related-experiences .experience-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:20px}
+
+.forecast-related-experiences .experience-preview+.experience-preview{margin-top:12px;padding-top:12px;border-top:1px solid #efedf5}
+.forecast-related-experiences .experience-preview h3{margin-bottom:6px}
+.forecast-related-experiences .experience-preview+.experience-actions{margin-top:12px}

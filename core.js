@@ -1,3 +1,4 @@
+import {seedDemoExperiences} from './demo-experiences.js';
 export const baseline=Array.from({length:30},(_,i)=>i<6?900:i===6?800:i===29?260:270);
 export const actual=[900,980,1040,1020,1000,980,920,...Array(22).fill(263),254];
 export const sum=a=>a.reduce((s,v)=>s+Number(v),0);
@@ -6,14 +7,14 @@ export const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 const initial=stage=>({stage,route:stage==='review'?'review':'home',taskId:'P001',tab:'result',settings:{configured:stage!=='first',region:'华东',product:'A商品',warehouses:['上海仓','杭州仓'],frequency:'daily',time:'08:30',granularity:'week',sort:'priority',pinned:['forecast','promo']},automation:{enabled:stage!=='first',running:false,runs:stage==='first'?[]:[{id:'Run001',status:'success',time:'09-30 08:30',summary:'检查完成，发现1项待处理问题',config:'华东 · A商品 · 两仓 / R1'}]},rules:[{id:'R001',name:'促销假设超出参考范围时提醒',threshold:9,revision:1,status:stage==='first'?'draft':'enabled',draft:null}],experiences:[],tasks:stage==='first'?[]:[{id:'P001',name:'A商品 · 华东 · 10月需求预测',region:'华东',product:'A商品',warehouses:['上海仓','杭州仓'],period:'2026-10-01 — 10-30',status:'success',versions:[{id:'V0',total:12400,data:[...baseline],source:'AI基线',parent:null,reason:'基于历史销量与业务日历生成',created:'09-30 08:00',rate:0},{id:'V1',total:12720,data:baseline.map((v,i)=>v+(i<4?80:0)),source:'人工调整',parent:'V0',reason:'促销前四天补充需求',created:'09-30 08:10',rate:5},{id:'V2',total:13144,data:baseline.map((v,i)=>i<7?Math.round(v*1.12):v),source:'人工调整',parent:'V0',reason:'促销周需求上调12%',created:'09-30 08:20',rate:12}],viewed:'V2',confirmed:'V0',candidate:'V2',diagnosis:{id:'D001',version:'V2',status:'open',evidence:'',source:'',reason:'',history:[],remind:''},scenarios:[{id:'S1',name:'谨慎方案',rate:8,status:'idle',total:null,version:null,revision:1},{id:'S2',name:'扩量方案',rate:10,status:'idle',total:null,version:null,revision:1}]}],assistant:[],demoFailure:false});
 const key='jinghui-workbench-v1';let loaded;try{loaded=JSON.parse(localStorage.getItem(key))}catch{};
 export const state=loaded?.tasks?loaded:initial('plan');
-normalizeAutomations();
+normalizeAutomations();seedDemoExperiences(state);
 try{localStorage.setItem(key,JSON.stringify(state))}catch{}
 export const task=(id=state.taskId)=>state.tasks.find(t=>t.id===id);
 export const version=(t,id=t?.viewed)=>t?.versions?.find(v=>v.id===id);
 export function save(){try{localStorage.setItem(key,JSON.stringify(state))}catch{}window.dispatchEvent(new Event('app:render'))}
 export function nav(route,params={}){Object.assign(state,{route},params);save();window.scrollTo(0,0)}
 export const demoDate=()=>state.stage==='review'?'2026年11月02日':'2026年09月30日';
-export function switchStage(stage,reset=false){if(!reset)localStorage.setItem(key+'-'+state.stage,JSON.stringify(state));let saved;try{saved=JSON.parse(localStorage.getItem(key+'-'+stage))}catch{};Object.keys(state).forEach(k=>delete state[k]);Object.assign(state,(!reset&&saved)||initial(stage));normalizeAutomations();resumeForecastRuns();resumeAutomationRuns();save();closeModal();toast('已切换到'+({plan:'计划处理',first:'首次配置',review:'历史复盘'}[stage])+'演示')}
+export function switchStage(stage,reset=false){if(!reset)localStorage.setItem(key+'-'+state.stage,JSON.stringify(state));let saved;try{saved=JSON.parse(localStorage.getItem(key+'-'+stage))}catch{};Object.keys(state).forEach(k=>delete state[k]);Object.assign(state,(!reset&&saved)||initial(stage));normalizeAutomations();seedDemoExperiences(state);resumeForecastRuns();resumeAutomationRuns();save();closeModal();toast('已切换到'+({plan:'计划处理',first:'首次配置',review:'历史复盘'}[stage])+'演示')}
 // Forecast jobs persist their deadline so refreshes and stage changes can resume safely.
 const forecastTimers=new Map();
 export function forecastScopeError(d={}){
