@@ -1,7 +1,7 @@
 import {contentDefaults,contentIntent} from './workbench-content.js';
 import {state,esc,icon} from './core.js';
 const defaults={...contentDefaults,layout:'tasks',split:true,warehouse:'all',grain:'day',compact:true,exceptionsOnly:true,showTrend:true,showTasks:true,showAutomation:true};
-const names={tasks:'待办优先',analysis:'趋势优先',automation:'托管优先'};
+const names={tasks:'待办优先',analysis:'分析视图',automation:'托管优先'};
 const model=()=>state.workbenchPersonalization??={saved:null,draft:null,invited:false};
 export const personalConfig=()=>state.workbenchPersonalization?.draft||state.workbenchPersonalization?.saved||null;
 export function workbenchIntent(text){
@@ -46,7 +46,7 @@ export function renderWorkbenchControls(){
  if(state.route!=='home')return '';
  const m=state.workbenchPersonalization;
  if(m?.draft)return `<div class="wb-chat-controls"><span class="tiny muted">新布局已在左侧预览</span><button class="btn primary" data-workbench-command="使用这个工作台">${icon('check',14)} 使用这个工作台</button><div class="row"><button class="btn small" data-workbench-command="换个布局">换个布局</button><button class="btn small" data-workbench-command="恢复原样">恢复原样</button></div><div class="wb-chat-suggestions"><button data-workbench-command="加一个每周需求柱状图">加柱状图</button><button data-workbench-command="加一个预测调整分布，看看改了哪几天">看调整分布</button><button data-workbench-command="加一个业务简报">加业务简报</button><button data-workbench-command="加一个关注清单和业务备忘">关注与备忘</button></div></div>`;
- if(m?.invited)return `<div class="wb-chat-controls"><span class="tiny muted">试着这样描述你的工作习惯</span><button class="wb-example" data-workbench-command="先给我一个业务简报，再看两个仓每周需求的柱状图。保留待办和AI任务异常，加一个业务备忘，隐藏趋势，整体紧凑一点。">先看业务简报和两仓每周柱状图，保留待办与托管异常，再留一个备忘。 ${icon('arrow',14)}</button></div>`;
+ if(m?.invited)return `<div class="wb-chat-controls"><span class="tiny muted">试着这样描述你的工作习惯</span><button class="wb-example" data-workbench-command="保留待办和AI任务异常，在后面加业务简报、两个仓每周需求的柱状图和业务备忘，隐藏趋势，整体紧凑一点。">待办与托管放前面，后面加业务简报、两仓每周柱状图和备忘。 ${icon('arrow',14)}</button></div>`;
  return `<div class="wb-chat-controls"><span class="tiny muted">让工作台增加你需要的内容</span><div class="wb-chat-suggestions"><button data-workbench-command="加一个每周需求柱状图">加一个图表</button><button data-workbench-command="加一个业务简报">加业务摘要</button><button data-workbench-command="加一个关注清单和业务备忘">关注或备忘</button></div></div>`;
 }
 export function workbenchPreviewBar(){return state.workbenchPersonalization?.draft?'<div class="wb-preview-bar"><span><strong>新布局预览</strong> · 在右侧继续聊，满意后直接采用</span><button class="text-button" data-workbench-command="恢复原样">恢复原样</button></div>':'';}
