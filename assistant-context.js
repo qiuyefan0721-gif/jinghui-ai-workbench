@@ -24,9 +24,9 @@ export function assistantContext(){
   const route=state.route||'home',t=selectedTask(),a=selectedAutomation(),stage=state.stage||'plan',adopted=autoAdoptedBaseline(t),needsCheck=baselineNeedsCheck(t);
   let key=[stage,route],title='',intro='',placeholder='告诉我你想了解当前页面的什么',suggestions=[];
   if(route==='home'){
-    title='我的工作台';intro=state.settings?.configured?`我会围绕你的待办和工作范围提供帮助。${taskBrief()}`:'先配置负责的商品、仓库和工作偏好，也可以直接发起一次预测。';
-    placeholder='例如：今天哪些事项需要我处理？';
-    suggestions=[suggestion('梳理今日待办','今天哪些事项需要我处理？','checkCircle'),suggestion('发起一次预测','我要新建一次预测','plus'),suggestion('调整工作设置','调整我的工作设置','settings')];
+    title='我的工作台';intro=state.settings?.configured?`我会围绕你的待办和工作范围提供帮助。${taskBrief()}`:'可以直接新建预测，也可以告诉我你的工作习惯，在左侧生成自己的工作台。';
+    placeholder='例如：待确认预测放前面，两仓趋势并排，AI任务只看异常';
+    suggestions=[suggestion('梳理今日待办','今天哪些事项需要我处理？','checkCircle'),suggestion('发起一次预测','我要新建一次预测','plus'),suggestion('帮我定制工作台','帮我定制工作台','sparkles')];
   }else if(route==='tasks'){
     title='预测任务';intro=`可以帮你梳理处理顺序和任务状态。${taskBrief()}`;placeholder='例如：任务列表里应该先处理什么？';
     suggestions=[suggestion('确定处理顺序','任务列表里应该先处理什么？','layers'),suggestion('说明任务状态','解释预测任务的不同状态','info'),suggestion('新建预测','我要新建一次预测','plus')];
